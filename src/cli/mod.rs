@@ -11,13 +11,23 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    Parse { file: Option<String> },
+    Parse {
+        file: Option<String>,
+    },
 
-    Run { file: Option<String> },
+    Run {
+        file: Option<String>,
+    },
 
-    Check { file: Option<String> },
+    Check {
+        file: Option<String>,
+        #[arg(long)]
+        format: Option<String>,
+    },
 
-    New { name: String },
+    New {
+        name: String,
+    },
 }
 
 fn read_source(path: &Option<String>) -> io::Result<String> {
@@ -69,27 +79,63 @@ pub fn run() {
                 std::process::exit(2);
             }
         },
-        Some(Commands::Check { file }) => match read_source(file) {
-            Ok(src) => match crate::frontend::parse(&src) {
-                Ok(prog) => {
-                    let has_main = prog.items.iter().any(|it| matches!(it, crate::syntax::Item::Function { name, .. } if name == "main"));
-                    if has_main {
-                        println!("OK: parse + minimal checks passed");
-                    } else {
-                        eprintln!("Check failed: missing 'main' function");
+        Some(Commands::Check { file, format }) => match read_source(file) {
+            Ok(src) => {
+                let want_json = matches!(format.as_deref(), Some("json"));
+                match crate::frontend::parse(&src) {
+                    Ok(prog) => {
+                        let has_main = prog.items.iter().any(|it| matches!(it, crate::syntax::Item::Function { name, .. } if name == "main"));
+                        if has_main {
+                            if want_json {
+                                println!("{{\"diagnostics\":[]}}");
+                            } else {
+                                println!("OK: parse + minimal checks passed");
+                            }
+                        } else {
+                            if want_json {
+                                let file_path = file.clone().unwrap_or_else(|| "".into());
+                                let msg = "missing 'main' function";
+                                println!(
+                                    "{{\"diagnostics\":[{{\"file\":\"{}\",\"line\":1,\"col\":1,\"severity\":\"error\",\"message\":\"{}\"}}]}}",
+                                    file_path,
+                                    escape_json(msg)
+                                );
+                            } else {
+                                eprintln!("Check failed: missing 'main' function");
+                            }
+                            std::process::exit(2);
+                        }
+                    }
+                    Err(e) => {
+                        if want_json {
+                            let file_path = file.clone().unwrap_or_else(|| "".into());
+                            println!(
+                                "{{\"diagnostics\":[{{\"file\":\"{}\",\"line\":1,\"col\":1,\"severity\":\"error\",\"message\":\"{}\"}}]}}",
+                                file_path,
+                                escape_json(&e)
+                            );
+                        } else {
+                            eprintln!("Parse error: {}", e);
+                        }
                         std::process::exit(2);
                     }
                 }
-                Err(e) => {
-                    eprintln!("Parse error: {}", e);
-                    std::process::exit(2);
-                }
-            },
+            }
             Err(e) => {
-                eprintln!("I/O error reading source: {}", e);
+                if matches!(format.as_deref(), Some("json")) {
+                    let file_path = file.clone().unwrap_or_else(|| "".into());
+                    println!(
+                        "{{\"diagnostics\":[{{\"file\":\"{}\",\"line\":1,\"col\":1,\"severity\":\"error\",\"message\":\"{}\"}}]}}",
+                        file_path,
+                        escape_json(&format!("I/O error reading source: {}", e))
+                    );
+                } else {
+                    eprintln!("I/O error reading source: {}", e);
+                }
                 std::process::exit(2);
             }
         },
+
         Some(Commands::New { name }) => {
             match create_project_in(std::env::current_dir().expect("cwd"), name) {
                 Ok(()) => println!("Created project '{}'", name),
@@ -136,6 +182,12 @@ targets = ["x86_64-linux", "x86_64-windows"]
     Ok(())
 }
 
+fn escape_json(s: &str) -> String {
+    s.replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -159,6 +211,19 @@ mod tests {
         match cli.command.unwrap() {
             Commands::Parse { file } => assert_eq!(file.unwrap(), "main.sd".to_string()),
             _ => panic!("expected parse subcommand"),
+        }
+    }
+
+    #[test]
+    fn clap_parses_check_json_flag() {
+        let args = vec!["shiden", "check", "main.sd", "--format", "json"];
+        let cli = Cli::parse_from(args);
+        match cli.command.unwrap() {
+            Commands::Check { file, format } => {
+                assert_eq!(file.unwrap(), "main.sd");
+                assert_eq!(format.unwrap(), "json");
+            }
+            _ => panic!("expected check subcommand"),
         }
     }
 

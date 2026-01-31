@@ -191,7 +191,7 @@ export function activate(context: vscode.ExtensionContext) {
         const workspaceFolder = (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]) ? vscode.workspace.workspaceFolders[0].uri.fsPath : undefined;
         const cp = require('child_process');
         try {
-            const cmd = `shiden check "${filePath}"`;
+            const cmd = `shiden check --format json "${filePath}"`;
             cp.exec(cmd, { cwd: workspaceFolder, timeout: 5000 }, (err: any, stdout: string, stderr: string) => {
 
                 const output = (stderr && stderr.trim() !== '') ? stderr : stdout || (err ? String(err) : '');
@@ -200,6 +200,44 @@ export function activate(context: vscode.ExtensionContext) {
                     diagCollection.delete(doc.uri);
                     return;
                 }
+
+                let parsed = null;
+                try { parsed = JSON.parse(output); } catch (e) {
+
+                    const idx = (typeof output === 'string') ? output.indexOf('{') : -1;
+                    if (idx !== -1) {
+                        try { parsed = JSON.parse(output.slice(idx)); } catch (e2) { parsed = null; }
+                    }
+                }
+                if (parsed && Array.isArray(parsed.diagnostics)) {
+
+                    const byFile = new Map<string, vscode.Diagnostic[]>();
+                    for (const d of parsed.diagnostics) {
+                        const msg = d.message || JSON.stringify(d);
+                        const line = (typeof d.line === 'number' && !isNaN(d.line)) ? Math.max(0, d.line - 1) : 0;
+                        const col = (typeof d.col === 'number' && !isNaN(d.col)) ? Math.max(0, d.col - 1) : 0;
+                        const r = new vscode.Range(new vscode.Position(line, col), new vscode.Position(line, col + 1));
+                        const sev = (d.severity || 'error').toLowerCase();
+                        const severity = sev === 'warning' ? vscode.DiagnosticSeverity.Warning : (sev === 'info' ? vscode.DiagnosticSeverity.Information : vscode.DiagnosticSeverity.Error);
+                        const diag = new vscode.Diagnostic(r, msg, severity);
+                        diag.source = 'shiden-cli';
+                        const fileKey = (d.file && typeof d.file === 'string' && d.file.trim() !== '') ? d.file : filePath;
+                        if (!byFile.has(fileKey)) { byFile.set(fileKey, []); }
+                        byFile.get(fileKey)!.push(diag);
+                    }
+
+                    for (const [fpath, ds] of byFile.entries()) {
+                        try {
+                            const uri = vscode.Uri.file(fpath);
+                            diagCollection.set(uri, ds);
+                        } catch (e) {
+
+                            diagCollection.set(doc.uri, ds);
+                        }
+                    }
+                    return;
+                }
+
                 const lines = output.toString().split(/\r?\n/).filter((l: string) => l.trim() !== '');
                 const diags: vscode.Diagnostic[] = [];
                 for (const l of lines) {
@@ -212,7 +250,6 @@ export function activate(context: vscode.ExtensionContext) {
                 if (diags.length > 0) { diagCollection.set(doc.uri, diags); } else { diagCollection.delete(doc.uri); }
             });
         } catch (e) {
-
             refreshDiagnosticsFor(doc);
         }
     }
@@ -523,14 +560,87 @@ export function activate(context: vscode.ExtensionContext) {
 
 
     const shidenKeywords = [
-        'fn', 'new', 'let', 'mut', 'return', 'if', 'else', 'while', 'for', 'in', 'break', 'continue', 'true', 'false',
-        'println', 'print', 'push', 'pop', 'len', 'range', 'array', 'unit'
+        'fn', 'new', 'let', 'mut', 'return', 'if', 'else', 'while', 'for', 'in', 'break', 'continue', 'true', 'false'
     ];
+    const shidenBuiltins = ['println', 'print', 'push', 'pop', 'len', 'range', 'read_file', 'write_file'];
+    const typeSuffixes = ["unit", "i64", "i32", "f64", "str", "char", "bool", "array", "usize", "u8", "u16", "u32", "u64", "f32", "i8", "i16"];
+
+    function collectLocalSymbols(document: vscode.TextDocument, position: vscode.Position): string[] {
+
+        for (let lineNo = position.line; lineNo >= 0; lineNo--) {
+            const line = document.lineAt(lineNo).text;
+            const m = /^\s*fn\s+new\s+([A-Za-z_][A-Za-z0-9_]*)(?:\(([^)]*)\))?/.exec(line);
+            if (m) {
+                const paramsRaw = (m[2] || '').trim();
+                const params = paramsRaw === '' ? [] : paramsRaw.split(',').map(s => s.trim().split('/')[0].trim());
+
+                const locals = new Set<string>();
+                for (let ln = lineNo + 1; ln <= position.line; ln++) {
+                    const l = document.lineAt(ln).text;
+                    const mm = /^\s*let\s+(?:mut\s+)?([A-Za-z_][A-Za-z0-9_]*)\b/.exec(l);
+                    if (mm) { locals.add(mm[1]); }
+                }
+
+                for (const p of params) { if (p) { locals.add(p.split(':')[0].trim()); } }
+                return Array.from(locals);
+            }
+        }
+        return [];
+    }
+
     context.subscriptions.push(vscode.languages.registerCompletionItemProvider(selector, {
         provideCompletionItems(document: vscode.TextDocument, position: vscode.Position) {
-            return shidenKeywords.map(k => { const item = new vscode.CompletionItem(k, vscode.CompletionItemKind.Keyword); item.detail = 'Shiden'; return item; });
-        }
-    }));
+            const suggestions: vscode.CompletionItem[] = [];
+            const line = document.lineAt(position.line).text;
+            const pre = line.slice(0, position.character);
+
+
+            if (pre.endsWith('/')) {
+                for (const t of typeSuffixes) {
+                    const it = new vscode.CompletionItem(t, vscode.CompletionItemKind.TypeParameter);
+                    it.detail = 'type suffix';
+                    suggestions.push(it);
+                }
+                return suggestions;
+            }
+
+
+            const locals = collectLocalSymbols(document, position);
+            for (const v of locals) {
+                const it = new vscode.CompletionItem(v, vscode.CompletionItemKind.Variable);
+                it.sortText = 'a';
+                suggestions.push(it);
+            }
+
+
+            const sigs = collectFunctionSignatures(document);
+            for (const [name, info] of sigs.entries()) {
+                const it = new vscode.CompletionItem(name, vscode.CompletionItemKind.Function);
+                it.detail = `fn ${name}(${info.params.join(', ')})${info.ret ? ` -> ${info.ret}` : ''}`;
+                it.insertText = new vscode.SnippetString(name + '($0)');
+                it.sortText = 'm';
+                suggestions.push(it);
+            }
+
+
+            for (const b of shidenBuiltins) {
+                const it = new vscode.CompletionItem(b, vscode.CompletionItemKind.Function);
+                it.detail = 'builtin';
+                it.sortText = 'z';
+                suggestions.push(it);
+            }
+
+
+            for (const k of shidenKeywords) {
+                const it = new vscode.CompletionItem(k, vscode.CompletionItemKind.Keyword);
+                it.sortText = 'y';
+                suggestions.push(it);
+            }
+
+            return suggestions;
+        },
+        resolveCompletionItem(item: vscode.CompletionItem) { return item; }
+    }, '/', '(', ','));
 }
 
 export function deactivate() { }

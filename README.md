@@ -40,7 +40,7 @@ CLI NAME: Shiden
 
 * Shiden new {name} (makes an new project)
 * Shiden init (makes a new project)
-* Shiden check (checks code for errors)
+* Shiden check (checks code for errors — supports `--format json` for structured diagnostics)
 * Shiden run (release mode by default, add --debug for debug mode)
 * Shiden build (release mode by default, add --debug for debug mode)
 * Shiden clean (removes build artifacts)

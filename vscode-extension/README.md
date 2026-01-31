@@ -10,7 +10,7 @@ Features
 - Linting heuristics: detects missing `main`, unused/duplicate functions, and provides quick fixes.
 - Code actions / quick fixes for common issues (append `/unit`, replace tabs, fix indentation, close `fn/` blocks).
 - Snippets for functions, `if`/`else`, `while`, `for`, array operations, and file I/O (`read_file`, `write_file`).
-- Basic completions for language keywords and builtins (triggered while editing).
+- Context-aware completions
 - Hover: shows simple function signatures inferred from `fn new` headers.
 - Signature help: shows parameter hints when typing function calls.
 
