@@ -1,0 +1,102 @@
+{
+  "name": "shiden",
+  "displayName": "Shiden",
+  "publisher": "IdiotStudios",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/IdiotStudios/shiden.git"
+  },
+  "version": "0.0.3",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Formatters"
+  ],
+  "activationEvents": [
+    "onLanguage:shiden",
+    "onCommand:shiden.formatDocument"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "shiden",
+        "aliases": ["Shiden", "shiden"],
+        "extensions": [".sd"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "shiden",
+        "scopeName": "source.shiden",
+        "path": "./syntaxes/shiden.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "shiden",
+        "path": "./snippets/shiden.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "shiden.formatDocument",
+        "title": "Shiden: Format Document"
+      }
+    ],
+    "configuration": {
+      "title": "Shiden",
+      "properties": {
+        "shiden.format.onSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically format Shiden files on save"
+        },
+        "shiden.diagnostics.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Shiden diagnostics (format checks) in the Problems view"
+        },
+        "shiden.diagnostics.onSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run diagnostics when the document is saved"
+        },
+        "shiden.lint.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Shiden linting (semantic checks)"
+        },
+        "shiden.lint.onSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run lint checks when the document is saved"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "npx vsce package",
+    "publish:manual": "npx vsce publish --pat $VSCE_PAT",
+    "pretest": "npm run compile && node ./out/test/runTest.js"
+  },
+  "description": "Formatter, diagnostics and snippets for the Shiden language",
+  "icon": "images/icon.png",
+  "homepage": "https://github.com/IdiotStudios/shiden",
+  "bugs": {
+    "url": "https://github.com/IdiotStudios/shiden/issues"
+  },
+  "keywords": ["shiden","format","language","formatter"],
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^4.0.0",
+    "@types/vscode": "^1.60.0",
+    "@types/node": "^14.14.0",
+    "vscode-test": "^1.5.0"
+  }
+}

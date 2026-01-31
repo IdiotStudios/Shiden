@@ -1,0 +1,12 @@
+# shiden.toml - project manifest
+[project]
+name = "test"
+version = "0.1.0"
+type = "binary"
+
+[build]
+opt_level = 3
+targets = ["x86_64-linux", "x86_64-windows"]
+
+[dependencies]
+# "pkg" = "version"

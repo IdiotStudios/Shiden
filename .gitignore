@@ -1,0 +1,5 @@
+/target
+/docs
+/vscode-extension/node_modules
+CHANGELOG.md
+/scripts

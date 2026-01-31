@@ -1,0 +1,4 @@
+fn new main/
+    let x = 1234/u64
+    println("Hello world")/
+fn/
