@@ -28,7 +28,7 @@ Shiden currently implements the following language features (stable enough for e
   - Builtins: `println`, `print`, file `read_file`/`write_file` (where available).
 - **Additional details**:
   - Typed terminators like `/i64` or a plain `/` are used to end many statements and declarations.
-  - Example programs live in the `examples/` directory — see `examples/brainfuck.shiden` (a Brainfuck interpreter written in Shiden).
+  - Example programs live in the `examples/` directory, see `examples/brainfuck.shiden` (a Brainfuck interpreter written in Shiden).
 
 ---
 
@@ -49,15 +49,15 @@ CLI NAME: Shiden
 
 ### Shiden init/new folder formats
 
-my_project/
-├── shiden.toml        // Manifest
-├── src/
-│   └── main.sd        // Executable entry
-├── tests/
-│   └── example.sd
-├── build/             // Compiled binaries
-├── cache/             // Cache
-└── README.md
+my_project/  
+├── shiden.toml        // Manifest  
+├── src/  
+│   └── main.sd        // Executable entry  
+├── tests/  
+│   └── example.sd  
+├── build/             // Compiled binaries  
+├── cache/             // Cache  
+└── README.md  
 
 shiden.toml:
 ```toml
