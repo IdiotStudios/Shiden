@@ -44,6 +44,10 @@
       {
         "command": "shiden.formatDocument",
         "title": "Shiden: Format Document"
+      },
+      {
+        "command": "shiden.runCheck",
+        "title": "Shiden: Run Check (shiden check)"
       }
     ],
     "configuration": {
@@ -63,6 +67,11 @@
           "type": "boolean",
           "default": true,
           "description": "Run diagnostics when the document is saved"
+        },
+        "shiden.diagnostics.useCli": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use the 'shiden' CLI (shiden check) to generate diagnostics when enabled. Falls back to heuristic diagnostics if CLI is unavailable."
         },
         "shiden.lint.enabled": {
           "type": "boolean",

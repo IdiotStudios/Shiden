@@ -19,7 +19,8 @@
     },
     "strings": {
       "patterns": [
-        { "name": "string.quoted.double.shiden", "begin": "\"", "end": "\"", "patterns": [{ "match": "\\\\.", "name": "constant.character.escape.shiden" }] }
+        { "name": "string.quoted.double.shiden", "begin": "\"", "end": "\"", "patterns": [{ "match": "\\\\.", "name": "constant.character.escape.shiden" }] },
+        { "name": "string.quoted.single.char.shiden", "begin": "'", "end": "'", "patterns": [{ "match": "\\\\.", "name": "constant.character.escape.shiden" }], "contentName": "constant.character.char.shiden" }
       ]
     },
     "numbers": {
@@ -48,8 +49,9 @@
 
     "keywords": {
       "patterns": [
-        { "name": "keyword.control", "match": "\\b(let|mut|return|if|else)\\b" },
-        { "name": "keyword.other", "match": "\\b(println|print)\\b" }
+        { "name": "keyword.control", "match": "\\b(let|mut|return|if|else|while|for|in|break|continue)\\b" },
+        { "name": "constant.language", "match": "\\b(true|false)\\b" },
+        { "name": "keyword.other", "match": "\\b(println|print|push|pop|len|range)\\b" }
       ]
     },
     "functions": {
@@ -74,13 +76,14 @@
       "patterns": [
         { "name": "punctuation.definition.parenthesis", "match": "[()\\[\\]{}]" },
         { "name": "punctuation.separator.comma", "match": "," },
-        { "name": "punctuation.terminator.statement", "match": "\\/(?=\\s|$)" }
+        { "name": "punctuation.terminator.statement", "match": "\\/(?=\\s|$)" },
+        { "name": "punctuation.terminator.typed", "match": "\\/[A-Za-z_][A-Za-z0-9_]*\\b" }
       ]
     },
 
     "operators": {
-      "patterns": [{ "name": "keyword.operator.shiden", "match": "==|=|<|>|\\+|-|\\*|/|&&|\\|\\||!" }]
-    }
+      "patterns": [{ "name": "keyword.operator.shiden", "match": "!=|==|<=|>=|=|<|>|\\+|-|\\*|/|&&|\\|\\||!" }]
+    },
   },
   "fileTypes": ["sd"]
 }

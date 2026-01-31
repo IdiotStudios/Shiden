@@ -179,13 +179,61 @@ export function activate(context: vscode.ExtensionContext) {
         const onSave = vscode.workspace.getConfiguration('shiden').get('diagnostics.onSave', true);
         if (!onSave) { return; }
         if (!doc.fileName.endsWith('.sd') && doc.languageId !== 'shiden') { return; }
-        refreshDiagnosticsFor(doc);
+
+        const useCli = vscode.workspace.getConfiguration('shiden').get('diagnostics.useCli', false);
+        if (useCli) { runShidenCheckFor(doc); } else { refreshDiagnosticsFor(doc); }
+    }));
+
+    async function runShidenCheckFor(doc: vscode.TextDocument) {
+        const enabled = vscode.workspace.getConfiguration('shiden').get('diagnostics.enabled', true);
+        if (!enabled) { diagCollection.delete(doc.uri); return; }
+        const filePath = doc.fileName;
+        const workspaceFolder = (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0]) ? vscode.workspace.workspaceFolders[0].uri.fsPath : undefined;
+        const cp = require('child_process');
+        try {
+            const cmd = `shiden check "${filePath}"`;
+            cp.exec(cmd, { cwd: workspaceFolder, timeout: 5000 }, (err: any, stdout: string, stderr: string) => {
+
+                const output = (stderr && stderr.trim() !== '') ? stderr : stdout || (err ? String(err) : '');
+                if (!err && (!output || output.trim() === '')) {
+
+                    diagCollection.delete(doc.uri);
+                    return;
+                }
+                const lines = output.toString().split(/\r?\n/).filter((l: string) => l.trim() !== '');
+                const diags: vscode.Diagnostic[] = [];
+                for (const l of lines) {
+                    const message = l.trim();
+                    const r = new vscode.Range(new vscode.Position(0, 0), new vscode.Position(0, 1));
+                    const d = new vscode.Diagnostic(r, `shiden check: ${message}`, vscode.DiagnosticSeverity.Error);
+                    d.source = 'shiden-cli';
+                    diags.push(d);
+                }
+                if (diags.length > 0) { diagCollection.set(doc.uri, diags); } else { diagCollection.delete(doc.uri); }
+            });
+        } catch (e) {
+
+            refreshDiagnosticsFor(doc);
+        }
+    }
+
+
+    context.subscriptions.push(vscode.commands.registerCommand('shiden.runCheck', async (uri?: vscode.Uri) => {
+        let doc: vscode.TextDocument | undefined;
+        if (uri) {
+            doc = await vscode.workspace.openTextDocument(uri);
+        } else if (vscode.window.activeTextEditor) {
+            doc = vscode.window.activeTextEditor.document;
+        }
+        if (doc && (doc.fileName.endsWith('.sd') || doc.languageId === 'shiden')) { runShidenCheckFor(doc); }
     }));
 
 
     for (const doc of vscode.workspace.textDocuments) {
         if (!doc.fileName.endsWith('.sd') && doc.languageId !== 'shiden') { continue; }
-        refreshDiagnosticsFor(doc);
+
+        const useCli = vscode.workspace.getConfiguration('shiden').get('diagnostics.useCli', false);
+        if (useCli) { runShidenCheckFor(doc); } else { refreshDiagnosticsFor(doc); }
     }
 
 
@@ -272,6 +320,62 @@ export function activate(context: vscode.ExtensionContext) {
         return diags;
     }
 
+
+    function collectFunctionSignatures(doc: vscode.TextDocument): Map<string, { params: string[], ret?: string, line: number }> {
+        const out = new Map<string, { params: string[], ret?: string, line: number }>();
+        const rx = /^\s*fn\s+new\s+([A-Za-z_][A-Za-z0-9_]*)(?:\(([^)]*)\))?\/?(?:\s*\/([A-Za-z_][A-Za-z0-9_]*))?/;
+        for (let i = 0; i < doc.lineCount; i++) {
+            const line = doc.lineAt(i).text;
+            const m = rx.exec(line);
+            if (m) {
+                const name = m[1];
+                const rawParams = (m[2] || '').trim();
+                const params = rawParams === '' ? [] : rawParams.split(',').map(s => s.trim());
+                const ret = m[3];
+                out.set(name, { params, ret, line: i });
+            }
+        }
+        return out;
+    }
+
+    context.subscriptions.push(vscode.languages.registerHoverProvider(selector, {
+        provideHover(document: vscode.TextDocument, position: vscode.Position) {
+            const wordRange = document.getWordRangeAtPosition(position, /[A-Za-z_][A-Za-z0-9_]*/);
+            if (!wordRange) { return null; }
+            const name = document.getText(wordRange);
+            const map = collectFunctionSignatures(document);
+            const sig = map.get(name);
+            if (!sig) { return null; }
+            const params = sig.params.join(', ');
+            const ret = sig.ret ? ` -> ${sig.ret}` : '';
+            const md = new vscode.MarkdownString(`**fn ${name}(${params})${ret}**`);
+            md.isTrusted = false;
+            return new vscode.Hover(md, wordRange);
+        }
+    }));
+
+    context.subscriptions.push(vscode.languages.registerSignatureHelpProvider(selector, {
+        provideSignatureHelp(document: vscode.TextDocument, position: vscode.Position) {
+            const line = document.lineAt(position.line).text.slice(0, position.character);
+            const callMatch = /([A-Za-z_][A-Za-z0-9_]*)\s*\([^\)]*$/.exec(line);
+            if (!callMatch) { return null; }
+            const name = callMatch[1];
+            const map = collectFunctionSignatures(document);
+            const sig = map.get(name);
+            if (!sig) { return null; }
+            const params = sig.params.map(p => new vscode.ParameterInformation(p));
+            const s = new vscode.SignatureInformation(`${name}(${sig.params.join(', ')})${sig.ret ? ` -> ${sig.ret}` : ''}`);
+            s.parameters = params;
+            const h = new vscode.SignatureHelp();
+            h.signatures = [s];
+            h.activeSignature = 0;
+
+            const argsSoFar = line.split('(').pop() || '';
+            h.activeParameter = Math.max(0, (argsSoFar.match(/,/g) || []).length);
+            return h;
+        }
+    }, '(', ','));
+
     function refreshLintFor(doc: vscode.TextDocument) {
         const enabled = vscode.workspace.getConfiguration('shiden').get('lint.enabled', true);
         if (!enabled) { lintCollection.delete(doc.uri); return; }
@@ -303,6 +407,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(vscode.languages.registerCodeActionsProvider(selector, {
         provideCodeActions(document: vscode.TextDocument, _range: vscode.Range, context: vscode.CodeActionContext): vscode.CodeAction[] {
             const actions: vscode.CodeAction[] = [];
+
             for (const diag of context.diagnostics) {
                 const line = diag.range.start.line;
                 const original = document.lineAt(line).text;
@@ -415,6 +520,17 @@ export function activate(context: vscode.ExtensionContext) {
             return actions;
         }
     }, { providedCodeActionKinds: [vscode.CodeActionKind.QuickFix] }));
+
+
+    const shidenKeywords = [
+        'fn', 'new', 'let', 'mut', 'return', 'if', 'else', 'while', 'for', 'in', 'break', 'continue', 'true', 'false',
+        'println', 'print', 'push', 'pop', 'len', 'range', 'array', 'unit'
+    ];
+    context.subscriptions.push(vscode.languages.registerCompletionItemProvider(selector, {
+        provideCompletionItems(document: vscode.TextDocument, position: vscode.Position) {
+            return shidenKeywords.map(k => { const item = new vscode.CompletionItem(k, vscode.CompletionItemKind.Keyword); item.detail = 'Shiden'; return item; });
+        }
+    }));
 }
 
 export function deactivate() { }

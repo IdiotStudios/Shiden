@@ -498,7 +498,7 @@ mod tests {
 
     #[test]
     fn lex_brainfuck_example() {
-        let src = std::fs::read_to_string("examples/brainfuck.shiden").expect("read example");
+        let src = std::fs::read_to_string("examples/brainfuck.sd").expect("read example");
         let mut l = Lexer::new(&src);
         let mut toks = Vec::new();
         loop {
