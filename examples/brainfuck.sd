@@ -1,4 +1,3 @@
-
 fn new run_bf(code)/
     let mut cmds = []/array
     for c in code/
