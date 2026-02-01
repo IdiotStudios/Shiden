@@ -5,6 +5,9 @@ Provides TextMate-based syntax highlighting for Shiden `.sd` files. This extensi
 Features
 - Syntax highlighting for `.sd` files (scopes defined in `syntaxes/shiden.tmLanguage.json`)
 
+Note
+- This extension is grammar-only; snippets and runtime language features (formatting, diagnostics, completions, etc.) have been removed.
+
 How to build
 1. cd vscode-extension
 2. vsce package
