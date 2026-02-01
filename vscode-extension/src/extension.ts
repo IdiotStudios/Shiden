@@ -565,6 +565,37 @@ export function activate(context: vscode.ExtensionContext) {
     const shidenBuiltins = ['println', 'print', 'push', 'pop', 'len', 'range', 'read_file', 'write_file'];
     const typeSuffixes = ["unit", "i64", "i32", "f64", "str", "char", "bool", "array", "usize", "u8", "u16", "u32", "u64", "f32", "i8", "i16"];
 
+
+    let workspaceFunctions: Array<{ name: string, params: string[], ret?: string, file: string }> = [];
+
+    async function refreshWorkspaceFunctionIndex() {
+        workspaceFunctions = [];
+        if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) { return; }
+        const files = await vscode.workspace.findFiles('**/*.sd', '**/target/**');
+        for (const f of files) {
+            try {
+                const doc = await vscode.workspace.openTextDocument(f);
+                const rx = /^\s*fn\s+new\s+([A-Za-z_][A-Za-z0-9_]*)(?:\(([^)]*)\))?\/?(?:\s*\/([A-Za-z_][A-Za-z0-9_]*))?/;
+                for (let i = 0; i < doc.lineCount; i++) {
+                    const m = rx.exec(doc.lineAt(i).text);
+                    if (m) {
+                        const name = m[1];
+                        const params = (m[2] || '').trim() === '' ? [] : m[2]!.split(',').map(s => s.trim());
+                        const ret = m[3];
+                        workspaceFunctions.push({ name, params, ret, file: doc.uri.fsPath });
+                    }
+                }
+            } catch (e) {
+
+            }
+        }
+    }
+
+
+    refreshWorkspaceFunctionIndex();
+    context.subscriptions.push(vscode.workspace.onDidSaveTextDocument((d) => { if (d.fileName.endsWith('.sd')) { refreshWorkspaceFunctionIndex(); } }));
+    context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => { refreshWorkspaceFunctionIndex(); }));
+
     function collectLocalSymbols(document: vscode.TextDocument, position: vscode.Position): string[] {
 
         for (let lineNo = position.line; lineNo >= 0; lineNo--) {
@@ -589,11 +620,10 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     context.subscriptions.push(vscode.languages.registerCompletionItemProvider(selector, {
-        provideCompletionItems(document: vscode.TextDocument, position: vscode.Position) {
+        async provideCompletionItems(document: vscode.TextDocument, position: vscode.Position) {
             const suggestions: vscode.CompletionItem[] = [];
             const line = document.lineAt(position.line).text;
             const pre = line.slice(0, position.character);
-
 
             if (pre.endsWith('/')) {
                 for (const t of typeSuffixes) {
@@ -619,6 +649,16 @@ export function activate(context: vscode.ExtensionContext) {
                 it.detail = `fn ${name}(${info.params.join(', ')})${info.ret ? ` -> ${info.ret}` : ''}`;
                 it.insertText = new vscode.SnippetString(name + '($0)');
                 it.sortText = 'm';
+                suggestions.push(it);
+            }
+
+
+            for (const wf of workspaceFunctions) {
+                if (wf.file === document.uri.fsPath) { continue; }
+                const it = new vscode.CompletionItem(wf.name, vscode.CompletionItemKind.Function);
+                it.detail = `fn ${wf.name}(${wf.params.join(', ')}) - ${vscode.Uri.file(wf.file).path}`;
+                it.insertText = new vscode.SnippetString(wf.name + '($0)');
+                it.sortText = 'p';
                 suggestions.push(it);
             }
 

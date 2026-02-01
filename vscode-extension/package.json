@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/IdiotStudios/shiden.git"
   },
-  "version": "0.0.3",
+  "version": "0.0.4",
   "engines": {
     "vscode": "^1.60.0"
   },
@@ -15,7 +15,8 @@
   ],
   "activationEvents": [
     "onLanguage:shiden",
-    "onCommand:shiden.formatDocument"
+    "onCommand:shiden.formatDocument",
+    "onCommand:shiden.runCheck"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -88,11 +89,10 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
+    "compile": "npm install && tsc -p ./",
     "watch": "tsc -watch -p ./",
     "package": "npx vsce package",
-    "publish:manual": "npx vsce publish --pat $VSCE_PAT",
-    "pretest": "npm run compile && node ./out/test/runTest.js"
+    "publish:manual": "npx vsce publish --pat $VSCE_PAT"
   },
   "description": "Formatter, diagnostics and snippets for the Shiden language",
   "icon": "images/icon.png",
