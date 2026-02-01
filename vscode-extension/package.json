@@ -11,14 +11,9 @@
     "vscode": "^1.60.0"
   },
   "categories": [
-    "Formatters"
+    "Programming Languages"
   ],
-  "activationEvents": [
-    "onLanguage:shiden",
-    "onCommand:shiden.formatDocument",
-    "onCommand:shiden.runCheck"
-  ],
-  "main": "./out/extension.js",
+
   "contributes": {
     "languages": [
       {
@@ -34,78 +29,14 @@
         "scopeName": "source.shiden",
         "path": "./syntaxes/shiden.tmLanguage.json"
       }
-    ],
-    "snippets": [
-      {
-        "language": "shiden",
-        "path": "./snippets/shiden.json"
-      }
-    ],
-    "commands": [
-      {
-        "command": "shiden.formatDocument",
-        "title": "Shiden: Format Document"
-      },
-      {
-        "command": "shiden.runCheck",
-        "title": "Shiden: Run Check (shiden check)"
-      }
-    ],
-    "configuration": {
-      "title": "Shiden",
-      "properties": {
-        "shiden.format.onSave": {
-          "type": "boolean",
-          "default": true,
-          "description": "Automatically format Shiden files on save"
-        },
-        "shiden.diagnostics.enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable Shiden diagnostics (format checks) in the Problems view"
-        },
-        "shiden.diagnostics.onSave": {
-          "type": "boolean",
-          "default": true,
-          "description": "Run diagnostics when the document is saved"
-        },
-        "shiden.diagnostics.useCli": {
-          "type": "boolean",
-          "default": false,
-          "description": "Use the 'shiden' CLI (shiden check) to generate diagnostics when enabled. Falls back to heuristic diagnostics if CLI is unavailable."
-        },
-        "shiden.lint.enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable Shiden linting (semantic checks)"
-        },
-        "shiden.lint.onSave": {
-          "type": "boolean",
-          "default": true,
-          "description": "Run lint checks when the document is saved"
-        }
-      }
-    }
+    ]
   },
-  "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "npm install && tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "package": "npx vsce package",
-    "publish:manual": "npx vsce publish --pat $VSCE_PAT"
-  },
-  "description": "Formatter, diagnostics and snippets for the Shiden language",
+  "description": "Syntax highlighting for the Shiden language (TextMate grammar only)",
   "icon": "images/icon.png",
   "homepage": "https://github.com/IdiotStudios/shiden",
   "bugs": {
     "url": "https://github.com/IdiotStudios/shiden/issues"
   },
-  "keywords": ["shiden","format","language","formatter"],
-  "license": "MIT",
-  "devDependencies": {
-    "typescript": "^4.0.0",
-    "@types/vscode": "^1.60.0",
-    "@types/node": "^14.14.0",
-    "vscode-test": "^1.5.0"
-  }
+  "keywords": ["shiden","language","syntax"],
+  "license": "MIT"
 }
