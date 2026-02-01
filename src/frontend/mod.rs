@@ -28,11 +28,9 @@ impl<'a> Parser<'a> {
             match &self.cur {
                 Token::Eof => break,
                 Token::Fn => {
-                    // could be fn new ... or fn/ (end marker)
                     if let Token::Slash = self.peek {
-                        // stray top-level fn/ — consume and continue
-                        self.advance(); // cur becomes Slash
-                        self.advance(); // cur becomes next
+                        self.advance();
+                        self.advance();
                         continue;
                     }
                     let f = self.parse_function()?;
@@ -44,7 +42,6 @@ impl<'a> Parser<'a> {
                     });
                 }
                 _ => {
-                    // skip unknown top-level tokens
                     self.advance();
                 }
             }
@@ -63,30 +60,26 @@ impl<'a> Parser<'a> {
         ),
         String,
     > {
-        // expecting: Fn New Identifier (params)? / ... Fn /
-        // cur == Fn
-        self.advance(); // now cur == New or other
+        self.advance();
         match &self.cur {
             Token::New => {}
             other => return Err(format!("expected 'new' after fn, got: {:?}", other)),
         }
-        self.advance(); // now cur should be Identifier
+        self.advance();
         let name = match &self.cur {
             Token::Identifier(s) => s.clone(),
             other => return Err(format!("expected identifier for fn name, got: {:?}", other)),
         };
 
-        // optional params (now typed: name/type)
         let mut params: Vec<(String, Option<String>)> = Vec::new();
         self.advance();
         if let Token::LParen = &self.cur {
-            // parse param list
             self.advance();
             while let Token::Identifier(_) = &self.cur {
                 if let Token::Identifier(id) = &self.cur {
                     let name = id.clone();
                     self.advance();
-                    // optional type annotation like '/i64' after param
+
                     if let Token::Type(t) = &self.cur {
                         let ptype = t.clone();
                         self.advance();
@@ -108,7 +101,6 @@ impl<'a> Parser<'a> {
             }
         }
 
-        // now expect '/' or '/<type>' (return type may be present as '/type')
         let mut ret_type: Option<String> = None;
         match &self.cur {
             Token::Slash => {
@@ -126,35 +118,30 @@ impl<'a> Parser<'a> {
             }
         }
 
-        // parse body until Fn Slash sequence
         let mut body = Vec::new();
         while !(matches!(&self.cur, Token::Fn) && matches!(&self.peek, Token::Slash)) {
             if let Token::Eof = &self.cur {
                 return Err("unexpected EOF while parsing function body".into());
             }
-            // DEBUG: print cur/peek for tracing
+
             println!("PARSE_FUNCTION: cur={:?} peek={:?}", self.cur, self.peek);
             if let Some(stmt) = self.parse_stmt()? {
                 body.push(stmt);
             } else {
-                // no stmt parsed, advance to avoid infinite loop
                 self.advance();
             }
         }
 
-        // consume Fn Slash
-        self.advance(); // cur becomes Slash
-        self.advance(); // cur becomes next after end
+        self.advance();
+        self.advance();
 
         Ok((name, params, ret_type, body))
     }
 
     fn parse_stmt(&mut self) -> Result<Option<Stmt>, String> {
-        // DEBUG: trace stmt entry
         println!("PARSE_STMT ENTRY cur={:?} peek={:?}", self.cur, self.peek);
         match &self.cur {
             Token::Let => {
-                // let (mut)? name = expr (/type)? /
                 self.advance();
                 let mut mutable = false;
                 if let Token::Mut = &self.cur {
@@ -167,14 +154,14 @@ impl<'a> Parser<'a> {
                         return Err(format!("expected identifier after let, got: {:?}", other));
                     }
                 };
-                self.advance(); // expect Equal
+                self.advance();
                 if let Token::Equal = &self.cur {
                 } else {
                     return Err("expected '=' after let name".into());
                 }
-                self.advance(); // expr start
+                self.advance();
                 let expr = self.parse_expr()?;
-                // mandatory type annotation token (acts as terminator)
+
                 let ty = if let Token::Type(t) = &self.cur {
                     let s = t.clone();
                     self.advance();
@@ -190,7 +177,6 @@ impl<'a> Parser<'a> {
                 }))
             }
             Token::Return => {
-                // return expr / or /<type>
                 self.advance();
                 let expr = self.parse_expr()?;
                 let ty = if let Token::Type(t) = &self.cur {
@@ -206,7 +192,6 @@ impl<'a> Parser<'a> {
                 Ok(Some(Stmt::Return(expr, ty)))
             }
             Token::Break => {
-                // break /
                 self.advance();
                 if let Token::Type(_t) = &self.cur {
                     self.advance();
@@ -219,7 +204,6 @@ impl<'a> Parser<'a> {
                 }
             }
             Token::Continue => {
-                // continue /
                 self.advance();
                 if let Token::Type(_t) = &self.cur {
                     self.advance();
@@ -232,7 +216,6 @@ impl<'a> Parser<'a> {
                 }
             }
             Token::For => {
-                // for <ident> in <expr>/ <stmts> fn/
                 self.advance();
                 let var = match &self.cur {
                     Token::Identifier(s) => s.clone(),
@@ -247,7 +230,7 @@ impl<'a> Parser<'a> {
                     return Err("expected 'in' after for variable".into());
                 }
                 let iterable = self.parse_expr()?;
-                // accept optional type annotation then '/'
+
                 if let Token::Type(_t) = &self.cur {
                     self.advance();
                 }
@@ -256,7 +239,7 @@ impl<'a> Parser<'a> {
                 } else {
                     return Err("expected '/' after for iterable".into());
                 }
-                // parse body until Fn /
+
                 let mut body = Vec::new();
                 while !(matches!(&self.cur, Token::Fn) && matches!(&self.peek, Token::Slash)) {
                     if let Token::Eof = &self.cur {
@@ -268,7 +251,7 @@ impl<'a> Parser<'a> {
                         self.advance();
                     }
                 }
-                // consume Fn /
+
                 self.advance();
                 self.advance();
                 Ok(Some(Stmt::For {
@@ -278,10 +261,9 @@ impl<'a> Parser<'a> {
                 }))
             }
             Token::If => {
-                // if <cond>/ <stmts> (else/ <stmts>)? fn/
-                self.advance(); // move to condition start
+                self.advance();
                 let cond = self.parse_expr()?;
-                // accept optional type annotation then '/'
+
                 if let Token::Type(_t) = &self.cur {
                     self.advance();
                 }
@@ -290,7 +272,7 @@ impl<'a> Parser<'a> {
                 } else {
                     return Err("expected '/' after if condition".into());
                 }
-                // parse then block until Else/ or Fn/
+
                 let mut then_block = Vec::new();
                 while !(matches!(&self.cur, Token::Else)
                     || (matches!(&self.cur, Token::Fn) && matches!(&self.peek, Token::Slash)))
@@ -306,7 +288,6 @@ impl<'a> Parser<'a> {
                 }
                 let mut else_block = None;
                 if let Token::Else = &self.cur {
-                    // consume Else and expected '/'
                     self.advance();
                     if let Token::Slash = &self.cur {
                         self.advance();
@@ -326,7 +307,7 @@ impl<'a> Parser<'a> {
                     }
                     else_block = Some(eblock);
                 }
-                // consume Fn /
+
                 if matches!(&self.cur, Token::Fn) && matches!(&self.peek, Token::Slash) {
                     self.advance();
                     self.advance();
@@ -340,10 +321,9 @@ impl<'a> Parser<'a> {
                 }))
             }
             Token::While => {
-                // while <cond>/ <stmts> fn/
-                self.advance(); // move to condition start
+                self.advance();
                 let cond = self.parse_expr()?;
-                // accept optional type annotation then '/'
+
                 if let Token::Type(_t) = &self.cur {
                     self.advance();
                 }
@@ -352,7 +332,7 @@ impl<'a> Parser<'a> {
                 } else {
                     return Err("expected '/' after while condition".into());
                 }
-                // parse body until Fn/
+
                 let mut body = Vec::new();
                 while !(matches!(&self.cur, Token::Fn) && matches!(&self.peek, Token::Slash)) {
                     if let Token::Eof = &self.cur {
@@ -364,7 +344,7 @@ impl<'a> Parser<'a> {
                         self.advance();
                     }
                 }
-                // consume Fn /
+
                 if matches!(&self.cur, Token::Fn) && matches!(&self.peek, Token::Slash) {
                     self.advance();
                     self.advance();
@@ -374,14 +354,12 @@ impl<'a> Parser<'a> {
                 Ok(Some(Stmt::While { cond, body }))
             }
             Token::Identifier(_) => {
-                // could be an assignment: ident = expr /  OR ident[expr] = expr /
                 if let Token::Identifier(id) = &self.cur {
                     let name = id.clone();
-                    // assignment to index a[expr] = val/
+
                     if let Token::LBracket = &self.peek {
-                        // parse index expression
-                        self.advance(); // cur becomes LBracket
-                        self.advance(); // cur becomes index expr start
+                        self.advance();
+                        self.advance();
                         let idx = self.parse_expr()?;
                         if let Token::RBracket = &self.cur {
                             self.advance();
@@ -389,7 +367,7 @@ impl<'a> Parser<'a> {
                             return Err("expected ']' in index".into());
                         }
                         if let Token::Equal = &self.cur {
-                            self.advance(); // cur becomes expr start
+                            self.advance();
                             let expr = self.parse_expr()?;
                             if let Token::Type(_t) = &self.cur {
                                 self.advance();
@@ -409,12 +387,10 @@ impl<'a> Parser<'a> {
                                 return Err("expected '/' after assignment".into());
                             }
                         }
-                        // if not an assignment, we should treat this as an index expr statement
-                        // fallthrough to parse_expr
                     }
                     if let Token::Equal = &self.peek {
-                        self.advance(); // cur becomes Equal
-                        self.advance(); // cur becomes expr start
+                        self.advance();
+                        self.advance();
                         let expr = self.parse_expr()?;
                         if let Token::Type(_t) = &self.cur {
                             self.advance();
@@ -427,7 +403,7 @@ impl<'a> Parser<'a> {
                         }
                     }
                 }
-                // fallback to expression statement
+
                 let expr = self.parse_expr()?;
                 if let Token::Type(_t) = &self.cur {
                     self.advance();
@@ -440,7 +416,6 @@ impl<'a> Parser<'a> {
                 }
             }
             Token::StringLiteral(_) => {
-                // expression statement (call or literal)
                 let expr = self.parse_expr()?;
                 if let Token::Type(_t) = &self.cur {
                     self.advance();
@@ -456,7 +431,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    // Expression parsing with precedence: comparators < add/sub < mul/div
     fn parse_expr(&mut self) -> Result<Expr, String> {
         self.parse_or()
     }
@@ -505,7 +479,7 @@ impl<'a> Parser<'a> {
         }
         Ok(left)
     }
-    // Note: this function was kept in the file as a helper when refactoring; kept for backward compatibility.
+
     #[allow(dead_code)]
     fn parse_or(&mut self) -> Result<Expr, String> {
         let mut left = self.parse_and()?;
@@ -576,7 +550,7 @@ impl<'a> Parser<'a> {
             Token::Minus => {
                 self.advance();
                 let rhs = self.parse_unary()?;
-                // unary - as numeric negate (prefer explicit Unary op)
+
                 Ok(Expr::Unary {
                     op: crate::syntax::UnaryOp::Neg,
                     expr: Box::new(rhs),
@@ -598,7 +572,6 @@ impl<'a> Parser<'a> {
         match &self.cur {
             Token::Identifier(name) => {
                 let name = name.clone();
-                // handle boolean literals 'true' and 'false'
                 if name == "true" {
                     self.advance();
                     return Ok(Expr::Bool(true));
@@ -607,6 +580,64 @@ impl<'a> Parser<'a> {
                     self.advance();
                     return Ok(Expr::Bool(false));
                 }
+
+                if name == "fs" {
+                    if let Token::Identifier(_) = &self.peek {
+                        self.advance();
+
+                        let mut parts: Vec<String> = Vec::new();
+                        if let Token::Identifier(s) = &self.cur {
+                            parts.push(s.clone());
+                        }
+
+                        if let Token::Minus = &self.peek {
+                            self.advance();
+                            if let Token::Identifier(s2) = &self.peek {
+                                self.advance();
+                                if let Token::Identifier(s2v) = &self.cur {
+                                    parts.push(s2v.clone());
+                                }
+                            }
+                        }
+
+                        if let Token::LParen = &self.peek {
+                            self.advance();
+                            self.advance();
+                            let mut args = Vec::new();
+                            while let Token::StringLiteral(_)
+                            | Token::Identifier(_)
+                            | Token::Number(_)
+                            | Token::LParen
+                            | Token::Bang
+                            | Token::Minus
+                            | Token::CharLiteral(_) = &self.cur
+                            {
+                                args.push(self.parse_expr()?);
+                                if let Token::Comma = &self.cur {
+                                    self.advance();
+                                    continue;
+                                }
+                                if let Token::RParen = &self.cur {
+                                    break;
+                                }
+                            }
+                            if let Token::RParen = &self.cur {
+                                self.advance();
+                            } else {
+                                return Err("expected ')'".into());
+                            }
+                            let sub = parts.join("-");
+                            let combined = format!("fs_{}", sub.replace('-', "_"));
+                            return Ok(Expr::Call {
+                                name: combined,
+                                args,
+                            });
+                        }
+
+                        return Ok(Expr::Identifier(name));
+                    }
+                }
+
                 self.advance();
                 if let Token::LParen = &self.cur {
                     self.advance();
@@ -636,7 +667,7 @@ impl<'a> Parser<'a> {
                     Ok(Expr::Call { name, args })
                 } else {
                     let mut primary = Ok(Expr::Identifier(name));
-                    // support indexing after an identifier: a[expr]
+
                     while let Token::LBracket = &self.cur {
                         self.advance();
                         let idx = self.parse_expr()?;
@@ -670,8 +701,7 @@ impl<'a> Parser<'a> {
                 Ok(Expr::Number(n))
             }
             Token::LBracket => {
-                // array literal
-                self.advance(); // consume '['
+                self.advance();
                 let mut elems = Vec::new();
                 while !matches!(&self.cur, Token::RBracket) {
                     elems.push(self.parse_expr()?);
@@ -870,14 +900,14 @@ mod tests {
     fn debug_parse_brainfuck_function() {
         let src = std::fs::read_to_string("examples/brainfuck.sd").expect("read example");
         let mut p = Parser::new(&src);
-        // advance until we hit the function header for run_bf
+
         while !(matches!(&p.cur, Token::Fn) && matches!(&p.peek, Token::New)) {
             p.advance();
             if let Token::Eof = p.cur {
                 panic!("no function found");
             }
         }
-        // now call parse_function and catch error
+
         match p.parse_function() {
             Ok((name, _params, _ret, body)) => {
                 println!("Parsed function '{}' with {} stmts", name, body.len())

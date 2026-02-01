@@ -1,0 +1,42 @@
+# Filesystem convenience wrappers for builtins
+
+# Read a file and return its contents as string
+fn new fs_read(path)/str
+    read_file(path)/str
+fn/
+
+# Write a string to a file (overwrites)
+fn new fs_write(path, content)/unit
+    write_file(path, content)/unit
+fn/
+
+# Edit a JSON file by setting a top-level key to the provided value.
+# Usage (namespace style):
+#     fs write("example.json", "{\"example\": true}")/unit
+#     fs edit("example.json", "example", false)/unit
+#
+# The parser also supports hyphenated subcommands like `fs array-append(...)`.
+# Uses builtin `fs_edit`, `fs_delete`, `fs_array_append`, and `fs_merge` under the hood.
+fn new fs_edit(path, key, value)/unit
+    fs_edit(path, key, value)/unit
+fn/
+
+# Edit with strategy: "replace" (default), "merge", "append", "unique"
+fn new fs_edit_strategy(path, key, value, strat)/unit
+    fs_edit(path, key, value, strat)/unit
+fn/
+
+# Delete a top-level key from JSON file
+fn new fs_delete(path, key)/unit
+    fs_delete(path, key)/unit
+fn/
+
+# Append value to array at key
+fn new fs_array_append(path, key, value)/unit
+    fs_array_append(path, key, value)/unit
+fn/
+
+# Merge a JSON string into the file (deep merge)
+fn new fs_merge(path, json_str)/unit
+    fs_merge(path, json_str)/unit
+fn/

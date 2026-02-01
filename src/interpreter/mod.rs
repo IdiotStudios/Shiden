@@ -58,13 +58,12 @@ impl Interpreter {
     }
 
     pub fn run_program(&mut self, prog: &Program) -> Result<(), String> {
-        // Find `main` function and execute it (main must not take params)
         let (params, _ret, body) =
             Self::find_function(prog, "main").ok_or("no 'main' function found".to_string())?;
         if !params.is_empty() {
             return Err("'main' must not accept parameters".into());
         }
-        // clear previous output
+
         self.out.clear();
         match self.execute_block(prog, body)? {
             ExecOutcome::Break | ExecOutcome::Continue => {
@@ -371,6 +370,47 @@ impl Interpreter {
                 _ => Err("type mismatch: expected number".into()),
             },
             other => Err(format!("unknown type annotation: {}", other)),
+        }
+    }
+
+    fn value_to_json(v: &Value) -> Result<serde_json::Value, String> {
+        match v {
+            Value::Str(s) => Ok(serde_json::Value::String(s.clone())),
+            Value::Int(i) => Ok(serde_json::Value::Number(serde_json::Number::from(*i))),
+            Value::UInt(u) => Ok(serde_json::Value::Number(serde_json::Number::from(*u))),
+            Value::Float(f) => serde_json::Number::from_f64(*f)
+                .map(serde_json::Value::Number)
+                .ok_or_else(|| "invalid float".to_string()),
+            Value::Bool(b) => Ok(serde_json::Value::Bool(*b)),
+            Value::Char(c) => Ok(serde_json::Value::String(c.to_string())),
+            Value::Array(arr, _t) => {
+                let mut vec = Vec::new();
+                for e in arr.iter() {
+                    vec.push(Self::value_to_json(e)?);
+                }
+                Ok(serde_json::Value::Array(vec))
+            }
+            Value::Unit => Err("cannot convert unit to json".into()),
+        }
+    }
+
+    fn json_deep_merge(dst: &mut serde_json::Value, src: &serde_json::Value) {
+        match (dst, src) {
+            (serde_json::Value::Object(dst_map), serde_json::Value::Object(src_map)) => {
+                for (k, v) in src_map {
+                    if dst_map.contains_key(k) {
+                        Self::json_deep_merge(dst_map.get_mut(k).unwrap(), v);
+                    } else {
+                        dst_map.insert(k.clone(), v.clone());
+                    }
+                }
+            }
+            (serde_json::Value::Array(dst_arr), serde_json::Value::Array(src_arr)) => {
+                dst_arr.extend(src_arr.clone());
+            }
+            (d, s) => {
+                *d = s.clone();
+            }
         }
     }
 
@@ -845,7 +885,7 @@ impl Interpreter {
                     }
                 }
 
-                if name == "read_file" {
+                if name == "read_file" || name == "fs_read" {
                     if evaled.len() != 1 {
                         return Err("read_file(path) expects 1 arg".into());
                     }
@@ -858,7 +898,7 @@ impl Interpreter {
                     };
                 }
 
-                if name == "write_file" {
+                if name == "write_file" || name == "fs_write" {
                     if evaled.len() != 2 {
                         return Err("write_file(path, content) expects 2 args".into());
                     }
@@ -868,6 +908,165 @@ impl Interpreter {
                             Ok(Value::Unit)
                         }
                         _ => Err("write_file expects string arguments".into()),
+                    };
+                }
+
+                if name == "fs_edit" {
+                    if evaled.len() != 3 && evaled.len() != 4 {
+                        return Err(
+                            "fs_edit(path, key, value[, strategy]) expects 3 or 4 args".into()
+                        );
+                    }
+
+                    let strategy = if evaled.len() == 4 {
+                        match &evaled[3] {
+                            Value::Str(s) => s.clone(),
+                            _ => return Err("strategy must be a string".into()),
+                        }
+                    } else {
+                        "replace".to_string()
+                    };
+
+                    return match (&evaled[0], &evaled[1]) {
+                        (Value::Str(path), Value::Str(key)) => {
+                            let new_val = Self::value_to_json(&evaled[2])?;
+                            let contents = std::fs::read_to_string(path).unwrap_or_else(|_| "{}".to_string());
+                            let mut json: serde_json::Value = serde_json::from_str(&contents).unwrap_or_else(|_| serde_json::Value::Object(serde_json::Map::new()));
+                            if !json.is_object() {
+                                json = serde_json::Value::Object(serde_json::Map::new());
+                            }
+                            let obj = json.as_object_mut().unwrap();
+
+                            match strategy.as_str() {
+                                "replace" => {
+                                    obj.insert(key.clone(), new_val);
+                                }
+                                "merge" => {
+                                    let entry = obj.entry(key.clone()).or_insert(serde_json::Value::Object(serde_json::Map::new()));
+                                    Self::json_deep_merge(entry, &new_val);
+                                }
+                                "append" => {
+                                    let entry = obj.entry(key.clone()).or_insert(serde_json::Value::Array(Vec::new()));
+                                    if let serde_json::Value::Array(a) = entry {
+                                        match new_val {
+                                            serde_json::Value::Array(mut na) => a.append(&mut na),
+                                            other => a.push(other),
+                                        }
+                                    } else {
+                                        return Err("append strategy requires existing value to be an array or absent".into());
+                                    }
+                                }
+                                "unique" => {
+                                    let entry = obj.entry(key.clone()).or_insert(serde_json::Value::Array(Vec::new()));
+                                    if let serde_json::Value::Array(a) = entry {
+                                        match new_val {
+                                            serde_json::Value::Array(na) => {
+                                                for v in na {
+                                                    if !a.iter().any(|x| x == &v) {
+                                                        a.push(v);
+                                                    }
+                                                }
+                                            }
+                                            other => {
+                                                if !a.iter().any(|x| x == &other) {
+                                                    a.push(other);
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        return Err("unique strategy requires existing value to be an array or absent".into());
+                                    }
+                                }
+                                _ => return Err("unknown strategy, valid: replace, merge, append, unique".into()),
+                            }
+
+                            let s = serde_json::to_string_pretty(&json).map_err(|e| e.to_string())?;
+                            std::fs::write(path, s).map_err(|e| e.to_string())?;
+                            Ok(Value::Unit)
+                        }
+                        _ => Err("fs_edit expects (path, key, value[, strategy]) where path and key are strings".into()),
+                    };
+                }
+
+                if name == "fs_delete" {
+                    if evaled.len() != 2 {
+                        return Err("fs_delete(path, key) expects 2 args".into());
+                    }
+                    return match (&evaled[0], &evaled[1]) {
+                        (Value::Str(path), Value::Str(key)) => {
+                            let contents =
+                                std::fs::read_to_string(path).unwrap_or_else(|_| "{}".to_string());
+                            let mut json: serde_json::Value = serde_json::from_str(&contents)
+                                .unwrap_or_else(|_| {
+                                    serde_json::Value::Object(serde_json::Map::new())
+                                });
+                            if let serde_json::Value::Object(obj) = &mut json {
+                                obj.remove(key);
+                            }
+                            let s =
+                                serde_json::to_string_pretty(&json).map_err(|e| e.to_string())?;
+                            std::fs::write(path, s).map_err(|e| e.to_string())?;
+                            Ok(Value::Unit)
+                        }
+                        _ => Err(
+                            "fs_delete expects (path, key) where path and key are strings".into(),
+                        ),
+                    };
+                }
+
+                if name == "fs_array_append" {
+                    if evaled.len() != 3 {
+                        return Err("fs_array_append(path, key, value) expects 3 args".into());
+                    }
+                    return match (&evaled[0], &evaled[1]) {
+                        (Value::Str(path), Value::Str(key)) => {
+                            let new_val = Self::value_to_json(&evaled[2])?;
+                            let contents = std::fs::read_to_string(path).unwrap_or_else(|_| "{}".to_string());
+                            let mut json: serde_json::Value = serde_json::from_str(&contents).unwrap_or_else(|_| serde_json::Value::Object(serde_json::Map::new()));
+                            if !json.is_object() {
+                                json = serde_json::Value::Object(serde_json::Map::new());
+                            }
+                            let entry = json.as_object_mut().unwrap().entry(key.clone()).or_insert(serde_json::Value::Array(Vec::new()));
+                            if let serde_json::Value::Array(a) = entry {
+                                match new_val {
+                                    serde_json::Value::Array(mut na) => a.append(&mut na),
+                                    other => a.push(other),
+                                }
+                            } else {
+                                return Err("existing value is not an array".into());
+                            }
+                            let s = serde_json::to_string_pretty(&json).map_err(|e| e.to_string())?;
+                            std::fs::write(path, s).map_err(|e| e.to_string())?;
+                            Ok(Value::Unit)
+                        }
+                        _ => Err("fs_array_append expects (path, key, value) where path and key are strings".into()),
+                    };
+                }
+
+                if name == "fs_merge" {
+                    if evaled.len() != 2 {
+                        return Err("fs_merge(path, json_str) expects 2 args".into());
+                    }
+                    return match (&evaled[0], &evaled[1]) {
+                        (Value::Str(path), Value::Str(json_str)) => {
+                            println!("fs_merge called with path={} json_str={}", path, json_str);
+                            let incoming: serde_json::Value =
+                                serde_json::from_str(json_str).map_err(|e| e.to_string())?;
+                            let contents =
+                                std::fs::read_to_string(path).unwrap_or_else(|_| "{}".to_string());
+                            let mut base: serde_json::Value = serde_json::from_str(&contents)
+                                .unwrap_or_else(|_| {
+                                    serde_json::Value::Object(serde_json::Map::new())
+                                });
+                            Self::json_deep_merge(&mut base, &incoming);
+                            let s =
+                                serde_json::to_string_pretty(&base).map_err(|e| e.to_string())?;
+                            std::fs::write(path, s).map_err(|e| e.to_string())?;
+                            Ok(Value::Unit)
+                        }
+                        _ => Err(
+                            "fs_merge expects (path, json_str) where both args are strings".into(),
+                        ),
                     };
                 }
 
@@ -1189,6 +1388,140 @@ mod tests {
         let mut it = Interpreter::new();
         it.run_program(&prog).expect("runtime error");
         assert_eq!(it.output(), "hello\n");
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn builtin_fs_edit() {
+        let base = std::env::temp_dir().join(format!("shiden_test_fs_edit_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let _ = std::fs::create_dir_all(&base);
+        let path = base.join("example.json");
+        let pstr = path.to_str().unwrap();
+
+        let src = format!(
+            "fn new main/\n    write_file(\"{}\", \"\")/unit\n    fs_edit(\"{}\", \"example\", false)/unit\n    let s = read_file(\"{}\")/str\n    println(\"{{}}\", s)/unit\nfn/",
+            pstr, pstr, pstr
+        );
+        let prog = parse(&src).expect("parse failed");
+        let mut it = Interpreter::new();
+        it.run_program(&prog).expect("runtime error");
+        let out = it.output();
+        assert!(out.contains("\"example\": false"));
+
+        let src2 = format!(
+            "fn new main/\n    write_file(\"{}\", \"\")/unit\n    fs edit(\"{}\", \"example\", false)/unit\n    let s = read_file(\"{}\")/str\n    println(\"{{}}\", s)/unit\nfn/",
+            pstr, pstr, pstr
+        );
+        let prog2 = parse(&src2).expect("parse failed");
+        let mut it2 = Interpreter::new();
+        it2.run_program(&prog2).expect("runtime error");
+        let out2 = it2.output();
+        assert!(out2.contains("\"example\": false"));
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn builtin_fs_array_append() {
+        let base =
+            std::env::temp_dir().join(format!("shiden_test_fs_array_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let _ = std::fs::create_dir_all(&base);
+        let path = base.join("example.json");
+        let pstr = path.to_str().unwrap();
+        let src = format!(
+            "fn new main/\n    let a = [1]/array\n    fs_edit(\"{}\", \"arr\", a)/unit\n    fs_array_append(\"{}\", \"arr\", 2)/unit\n    let s = read_file(\"{}\")/str\n    println(\"{{}}\", s)/unit\nfn/",
+            pstr, pstr, pstr
+        );
+        let prog = parse(&src).expect("parse failed");
+        let mut it = Interpreter::new();
+        it.run_program(&prog).expect("runtime error");
+        let out = it.output();
+        let j: serde_json::Value = serde_json::from_str(&out).expect("file should be JSON");
+        assert!(j["arr"].is_array());
+        let arr = j["arr"].as_array().unwrap();
+        assert!(
+            arr.iter()
+                .any(|v| v == &serde_json::Value::Number(1.into()))
+        );
+        assert!(
+            arr.iter()
+                .any(|v| v == &serde_json::Value::Number(2.into()))
+        );
+        let _ = std::fs::remove_dir_all(&base);
+        let _ = std::fs::create_dir_all(&base);
+
+        let src2 = format!(
+            "fn new main/\n    let a = [1]/array\n    fs edit(\"{}\", \"arr\", a)/unit\n    fs array-append(\"{}\", \"arr\", 2)/unit\n    let s = read_file(\"{}\")/str\n    println(\"{{}}\", s)/unit\nfn/",
+            pstr, pstr, pstr
+        );
+        let prog2 = parse(&src2).expect("parse failed");
+        let mut it2 = Interpreter::new();
+        it2.run_program(&prog2).expect("runtime error");
+        let out2 = it2.output();
+        let j2: serde_json::Value = serde_json::from_str(&out2).expect("file should be JSON");
+        assert!(j2["arr"].is_array());
+        let arr2 = j2["arr"].as_array().unwrap();
+        assert!(
+            arr2.iter()
+                .any(|v| v == &serde_json::Value::Number(1.into()))
+        );
+        assert!(
+            arr2.iter()
+                .any(|v| v == &serde_json::Value::Number(2.into()))
+        );
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn builtin_fs_edit_append_and_unique() {
+        let base =
+            std::env::temp_dir().join(format!("shiden_test_fs_edit_append_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let _ = std::fs::create_dir_all(&base);
+        let path = base.join("example.json");
+        let pstr = path.to_str().unwrap();
+        let src = format!(
+            "fn new main/\n    let a = [1]/array\n    let b = [2]/array\n    fs_edit(\"{}\", \"arr\", a)/unit\n    fs_edit(\"{}\", \"arr\", b, \"append\")/unit\n    fs_edit(\"{}\", \"arr\", 2, \"unique\")/unit\n    let s = read_file(\"{}\")/str\n    println(\"{{}}\", s)/unit\nfn/",
+            pstr, pstr, pstr, pstr
+        );
+        let prog = parse(&src).expect("parse failed");
+        let mut it = Interpreter::new();
+        it.run_program(&prog).expect("runtime error");
+        let out = it.output();
+        let j: serde_json::Value = serde_json::from_str(&out).expect("file should be JSON");
+        assert!(j["arr"].is_array());
+        let arr = j["arr"].as_array().unwrap();
+        assert!(
+            arr.iter()
+                .any(|v| v == &serde_json::Value::Number(1.into()))
+        );
+        assert!(
+            arr.iter()
+                .any(|v| v == &serde_json::Value::Number(2.into()))
+        );
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn builtin_fs_edit_merge_and_delete() {
+        let base =
+            std::env::temp_dir().join(format!("shiden_test_fs_merge_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let _ = std::fs::create_dir_all(&base);
+        let path = base.join("example.json");
+        let pstr = path.to_str().unwrap();
+
+        let src = format!(
+            "fn new main/\n    let a = [1]/array\n    fs_edit(\"{}\", \"obj\", a)/unit\n    fs_array_append(\"{}\", \"obj\", 2)/unit\n    fs_delete(\"{}\", \"obj\")/unit\n    let s = read_file(\"{}\")/str\n    println(\"{{}}\", s)/unit\nfn/",
+            pstr, pstr, pstr, pstr
+        );
+        let prog = parse(&src).expect("parse failed");
+        let mut it = Interpreter::new();
+        it.run_program(&prog).expect("runtime error");
+        let out = it.output();
+
+        assert!(!out.contains("\"obj\""));
         let _ = std::fs::remove_dir_all(&base);
     }
 

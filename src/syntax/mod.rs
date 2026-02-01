@@ -63,7 +63,6 @@ impl<'a> Lexer<'a> {
     }
 
     pub fn next_token(&mut self) -> Token {
-        // skip whitespace
         while let Some(ch) = self.peek_char() {
             if ch.is_whitespace() {
                 self.bump(1);
@@ -78,7 +77,6 @@ impl<'a> Lexer<'a> {
 
         let ch = self.peek_char().unwrap();
 
-        // single-char
         if ch == '(' {
             self.bump(1);
             return Token::LParen;
@@ -96,13 +94,10 @@ impl<'a> Lexer<'a> {
             return Token::RBracket;
         }
         if ch == '=' {
-            // support '==' and '='
-            // peek next char
             let rest = &self.src[self.pos..];
             let mut it = rest.chars();
-            it.next(); // current '='
+            it.next();
             if let Some('=') = it.next() {
-                // consume two
                 self.bump(2);
                 return Token::EqEq;
             }
@@ -114,7 +109,6 @@ impl<'a> Lexer<'a> {
             return Token::Comma;
         }
         if ch == '<' {
-            // support '<='
             let rest = &self.src[self.pos..];
             if rest.starts_with("<=") {
                 self.bump(2);
@@ -124,7 +118,6 @@ impl<'a> Lexer<'a> {
             return Token::Less;
         }
         if ch == '>' {
-            // support '>='
             let rest = &self.src[self.pos..];
             if rest.starts_with(">=") {
                 self.bump(2);
@@ -146,7 +139,6 @@ impl<'a> Lexer<'a> {
             return Token::Star;
         }
         if ch == '&' {
-            // expect '&&'
             let rest = &self.src[self.pos..];
             if rest.starts_with("&&") {
                 self.bump(2);
@@ -154,7 +146,6 @@ impl<'a> Lexer<'a> {
             }
         }
         if ch == '|' {
-            // expect '||'
             let rest = &self.src[self.pos..];
             if rest.starts_with("||") {
                 self.bump(2);
@@ -162,7 +153,6 @@ impl<'a> Lexer<'a> {
             }
         }
         if ch == '!' {
-            // support '!=' as a single token
             let rest = &self.src[self.pos..];
             let mut it = rest.chars();
             it.next();
@@ -174,8 +164,6 @@ impl<'a> Lexer<'a> {
             return Token::Bang;
         }
         if ch == '/' {
-            // decide operator (division) vs statement terminator vs type suffix
-            // look ahead for the next non-space/tab char; if it's a newline or EOF, treat as terminator
             let rest = &self.src[self.pos + 1..];
 
             let types = [
