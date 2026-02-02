@@ -1,47 +1,4 @@
-use crate::syntax::{Expr, Item, Program, Stmt};
-use std::collections::{HashMap, HashSet};
-use std::io::Write;
-
-#[derive(Debug, Clone, PartialEq)]
-enum Value {
-    Str(String),
-    Int(i64),
-    UInt(u64),
-    Float(f64),
-    Bool(bool),
-    Char(char),
-    Array(Vec<Value>, Option<String>),
-    Unit,
-}
-
-impl std::fmt::Display for Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Value::Str(s) => write!(f, "{}", s),
-            Value::Int(n) => write!(f, "{}", n),
-            Value::UInt(n) => write!(f, "{}", n),
-            Value::Float(n) => write!(f, "{}", n),
-            Value::Bool(b) => write!(f, "{}", b),
-            Value::Char(c) => write!(f, "{}", c),
-            Value::Array(a, _typ) => {
-                let mut parts = Vec::new();
-                for v in a {
-                    parts.push(format!("{}", v));
-                }
-                write!(f, "[{}]", parts.join(", "))
-            }
-            Value::Unit => write!(f, ""),
-        }
-    }
-}
-
-enum ExecOutcome {
-    None,
-    Return(Value),
-    Break,
-    Continue,
-}
-
+#[allow(dead_code)]
 pub struct Interpreter {
     out: Vec<u8>,
     globals: HashMap<String, Value>,

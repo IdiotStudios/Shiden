@@ -12,7 +12,36 @@ VSCode-Extension: [here](https://marketplace.visualstudio.com/items?itemName=Idi
 
 Shiden currently implements the following language features (stable enough for examples and tests):
 
-- **Syntax & core**: Lexer, recursive-descent parser, AST, and a tree-walk interpreter.
+- **Syntax & core**: Lexer, recursive-descent parser, AST, and an ahead-of-time compiler backend.
+
+## Compiler & Build pipeline
+
+Shiden compiles `.sd` programs into native x86_64 ELF binaries (Linux) using an internal pipeline:
+(Working on Windows and macos compilation next)
+
+1. **Parse** — `frontend::parse(src)` → `Program` (AST).
+2. **Lowering** — AST → small stack-based IR (push/pop, binops, control flow, calls/ret).
+3. **Codegen** — IR → text section bytes (machine code), uses `object` crate to produce a relocatable object.
+4. **Assemble & Link** — invoke `as` and `ld` to produce the final executable.
+
+Important implementation notes:
+- SystemV x86_64 calling convention is used for function calls (registers: `rdi, rsi, rdx, rcx, r8, r9`, extras on stack).
+- The compiler supports spilling arguments past the register count and maintains 16-byte alignment.
+
+Usage:
+
+```bash
+# compile a project in the current directory (expects shiden.toml)
+shiden compile
+
+# compile and run a single source file (temporary project)
+shiden run examples/hello.sd
+```
+
+Contributing & Development
+
+- Tests: `cargo test` — the test suite contains many end-to-end cases that compile test programs, run the produced executable, and assert stdout.
+- Build: the build backend lives in `src/build/mod.rs` (lowering + codegen).
 - **Types & values**: `i64`, `f64`, `char`, `string`, `array`, `unit`, `bool`.
 - **Expressions & operators**:
   - Arithmetic: `+`, `-`, `*`, `/`.

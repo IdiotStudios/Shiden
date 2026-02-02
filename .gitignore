@@ -3,3 +3,4 @@
 /vscode-extension/node_modules
 CHANGELOG.md
 /scripts
+/test/build
