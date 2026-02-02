@@ -5,6 +5,7 @@ Shiden is a high-performance, ahead-of-time compiled programming language focuse
 Shiden has a .sd file format
 
 VSCode-Extension: [here](https://marketplace.visualstudio.com/items?itemName=IdiotStudios.shiden)
+Flavortown-Project: [here](https://flavortown.hackclub.com/projects/10866)
 
 ---
 
