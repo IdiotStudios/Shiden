@@ -48,12 +48,6 @@ jobs:
       - name: Run cargo test
         run: cargo test --verbose
 
-      - name: Cache target
-        uses: actions/cache@v4
-        with:
-          path: |
-            ./target
-
   shiden:
     runs-on: ubuntu-latest
     environment:
@@ -83,12 +77,6 @@ jobs:
 
       - name: Run cargo build
         run: cargo build --release
-
-      - name: Cache target
-        uses: actions/cache@v4
-        with:
-          path: |
-            ./target
 
       - name: Run Shiden Brainfuck interpreter
         run: cargo run -- run examples/
