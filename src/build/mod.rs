@@ -1298,6 +1298,8 @@ pub fn compile_project(
             .map_err(|e| format!("failed to write exe: {}", e))?;
         f.sync_all()
             .map_err(|e| format!("failed to sync exe: {}", e))?;
+        
+        drop(f);
     }
 
     #[cfg(unix)]
@@ -1321,6 +1323,25 @@ mod tests {
     use std::process::Command;
     use tempfile::tempdir;
 
+    
+    
+    fn run_exe(exe: &std::path::Path) -> std::io::Result<std::process::Output> {
+        let mut attempts = 0;
+        const MAX_ATTEMPTS: u32 = 5;
+        
+        loop {
+            match Command::new(exe).output() {
+                Ok(output) => return Ok(output),
+                Err(e) if e.raw_os_error() == Some(26) && attempts < MAX_ATTEMPTS => {
+                    
+                    attempts += 1;
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
+                Err(e) => return Err(e),
+            }
+        }
+    }
+
     #[test]
     fn compile_simple_println_and_run() {
         let td = tempdir().expect("tempdir");
@@ -1338,7 +1359,7 @@ mod tests {
         .expect("write mf");
 
         let exe = compile_project(pd, "test", "x86_64-linux", None).expect("compile");
-        let out = Command::new(&exe).output().expect("run exe");
+        let out = run_exe(&exe).expect("run exe");
         assert!(out.status.success());
         assert_eq!(String::from_utf8_lossy(&out.stdout), "hello\n");
     }
@@ -1360,7 +1381,7 @@ mod tests {
         .expect("write mf");
 
         let exe = compile_project(pd, "test", "x86_64-linux", None).expect("compile");
-        let out = Command::new(&exe).output().expect("run exe");
+        let out = run_exe(&exe).expect("run exe");
         assert!(out.status.success());
         assert_eq!(String::from_utf8_lossy(&out.stdout), "sum 5 4\n");
     }
@@ -1378,7 +1399,7 @@ mod tests {
         .expect("write mf");
 
         let exe = compile_project(pd, "test", "x86_64-linux", None).expect("compile");
-        let out = Command::new(&exe).output().expect("run exe");
+        let out = run_exe(&exe).expect("run exe");
         if !out.status.success() {
             panic!(
                 "exe failed: {} stderr:{}",
@@ -1410,7 +1431,7 @@ mod tests {
             println!("objdump stdout:\n{}", String::from_utf8_lossy(&od.stdout));
             println!("objdump stderr:\n{}", String::from_utf8_lossy(&od.stderr));
         }
-        let out = Command::new(&exe).output().expect("run exe");
+        let out = run_exe(&exe).expect("run exe");
         if !out.status.success() {
             panic!(
                 "exe failed: {} stderr:{}",
@@ -1437,7 +1458,7 @@ mod tests {
         .expect("write mf");
 
         let exe = compile_project(pd, "test", "x86_64-linux", None).expect("compile");
-        let out = Command::new(&exe).output().expect("run exe");
+        let out = run_exe(&exe).expect("run exe");
         assert!(out.status.success());
         assert_eq!(String::from_utf8_lossy(&out.stdout), "yes\nafter\n");
     }
@@ -1455,7 +1476,7 @@ mod tests {
         .expect("write mf");
 
         let exe = compile_project(pd, "test", "x86_64-linux", None).expect("compile");
-        let out = Command::new(&exe).output().expect("run exe");
+        let out = run_exe(&exe).expect("run exe");
         assert!(out.status.success());
         assert_eq!(String::from_utf8_lossy(&out.stdout), "0\n1\n2\ndone\n");
     }
@@ -1477,7 +1498,7 @@ mod tests {
         .expect("write mf");
 
         let exe = compile_project(pd, "test", "x86_64-linux", None).expect("compile");
-        let out = Command::new(&exe).output().expect("run exe");
+        let out = run_exe(&exe).expect("run exe");
         assert!(out.status.success());
         assert_eq!(String::from_utf8_lossy(&out.stdout), "res 0\n");
     }
@@ -1499,7 +1520,7 @@ mod tests {
         .expect("write mf");
 
         let exe = compile_project(pd, "test", "x86_64-linux", None).expect("compile");
-        let out = Command::new(&exe).output().expect("run exe");
+        let out = run_exe(&exe).expect("run exe");
         assert!(out.status.success());
         assert_eq!(String::from_utf8_lossy(&out.stdout), "res 1\n");
     }
@@ -1523,7 +1544,7 @@ mod tests {
             std::path::Path::new("/tmp/shiden_test_function_call_exe"),
         );
         println!("exe path: {}", exe.display());
-        let out = Command::new(&exe).output().expect("run exe");
+        let out = run_exe(&exe).expect("run exe");
         if !out.status.success() {
             panic!(
                 "exe failed: {} stderr:{}",
@@ -1552,7 +1573,7 @@ mod tests {
             &exe,
             std::path::Path::new("/tmp/shiden_test_function_call_debug_exe"),
         );
-        let out = Command::new(&exe).output().expect("run exe");
+        let out = run_exe(&exe).expect("run exe");
         if !out.status.success() {
             panic!(
                 "exe failed: {} stderr:{}",
@@ -1582,7 +1603,7 @@ mod tests {
         let exe = compile_project(pd, "test", "x86_64-linux", None).expect("compile");
 
         let _ = std::fs::copy(&exe, std::path::Path::new("/tmp/shiden_many_args_exe"));
-        let out = Command::new(&exe).output().expect("run exe");
+        let out = run_exe(&exe).expect("run exe");
         if !out.status.success() {
             panic!(
                 "exe failed: {} stderr:{}",
@@ -1622,7 +1643,7 @@ mod tests {
             println!("objdump stderr:\n{}", String::from_utf8_lossy(&od.stderr));
         }
 
-        let out = Command::new(&exe).output().expect("run exe");
+        let out = run_exe(&exe).expect("run exe");
 
         println!(
             "status: {:?}\nstdout: {}\nstderr: {}",
