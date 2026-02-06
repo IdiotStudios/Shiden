@@ -1,6 +1,6 @@
-use object::write::{Object, Relocation, StandardSection, Symbol, SymbolSection};
+use object::SymbolScope;
+use object::write::{Object, StandardSection, Symbol, SymbolSection};
 use object::{Architecture, BinaryFormat, Endianness};
-use object::{RelocationEncoding, RelocationKind, SymbolScope};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -48,6 +48,7 @@ pub fn compile_project(
         EmitInt,
         StoreLocal(usize),
         LoadLocal(usize),
+        Pop,
         Label(usize),
         Jump(usize),
         JumpIfFalse(usize),
@@ -168,7 +169,33 @@ pub fn compile_project(
                     }
                 }
             }
-            _ => Err("unsupported expression in runtime lowering".into()),
+            Expr::Char(c) => {
+                out.push(IrInstr::PushConst(*c as i64));
+                Ok(())
+            }
+            Expr::StringLiteral(s) => {
+                out.push(IrInstr::Call("array_new".into(), 0));
+                for ch in s.chars() {
+                    out.push(IrInstr::PushConst(ch as i64));
+                    out.push(IrInstr::Call("push".into(), 2));
+                }
+                Ok(())
+            }
+            Expr::ArrayLiteral(elems) => {
+                out.push(IrInstr::Call("array_new".into(), 0));
+                for el in elems {
+                    lower_expr_to_ir(el, out, locals, next_label)?;
+                    out.push(IrInstr::Call("push".into(), 2));
+                }
+                Ok(())
+            }
+            Expr::Index { expr: arr, index } => {
+                lower_expr_to_ir(arr, out, locals, next_label)?;
+                lower_expr_to_ir(index, out, locals, next_label)?;
+                out.push(IrInstr::Call("array_get".into(), 2));
+                Ok(())
+            }
+            _ => Err(format!("unsupported expression in runtime lowering: {:?}", e).into()),
         }
     }
 
@@ -177,6 +204,8 @@ pub fn compile_project(
         locals: &mut std::collections::HashMap<String, usize>,
         next_local: &mut usize,
         next_label: &mut usize,
+        break_lbl: Option<usize>,
+        continue_lbl: Option<usize>,
     ) -> Result<Vec<IrInstr>, String> {
         use crate::syntax::*;
         match stmt {
@@ -192,6 +221,33 @@ pub fn compile_project(
                     i
                 };
                 res.push(IrInstr::StoreLocal(idx));
+                Ok(res)
+            }
+            Stmt::Break => {
+                if let Some(lbl) = break_lbl {
+                    Ok(vec![IrInstr::Jump(lbl)])
+                } else {
+                    Err("break outside loop".into())
+                }
+            }
+            Stmt::Continue => {
+                if let Some(lbl) = continue_lbl {
+                    Ok(vec![IrInstr::Jump(lbl)])
+                } else {
+                    Err("continue outside loop".into())
+                }
+            }
+            Stmt::AssignIndex { name, index, value } => {
+                let mut res = Vec::new();
+
+                let arr_idx = locals
+                    .get(name)
+                    .ok_or_else(|| format!("assign-index to unknown variable '{}'", name))?;
+                res.push(IrInstr::LoadLocal(*arr_idx));
+
+                lower_expr_to_ir(index, &mut res, locals, next_label)?;
+                lower_expr_to_ir(value, &mut res, locals, next_label)?;
+                res.push(IrInstr::Call("array_set".into(), 3));
                 Ok(res)
             }
             Stmt::Assign { name, value } => {
@@ -244,6 +300,13 @@ pub fn compile_project(
                 }
                 Err("first argument to println must be a string literal format".into())
             }
+            Stmt::Expr(expr) => {
+                let mut res = Vec::new();
+                lower_expr_to_ir(expr, &mut res, locals, next_label)?;
+
+                res.push(IrInstr::Pop);
+                return Ok(res);
+            }
             Stmt::If {
                 cond,
                 then_block,
@@ -257,14 +320,28 @@ pub fn compile_project(
                 lower_expr_to_ir(cond, &mut res, locals, next_label)?;
                 res.push(IrInstr::JumpIfFalse(else_lbl));
                 for s in then_block {
-                    let mut inner = lower_stmt_to_ir(s, locals, next_local, next_label)?;
+                    let mut inner = lower_stmt_to_ir(
+                        s,
+                        locals,
+                        next_local,
+                        next_label,
+                        break_lbl,
+                        continue_lbl,
+                    )?;
                     res.append(&mut inner);
                 }
                 res.push(IrInstr::Jump(end_lbl));
                 res.push(IrInstr::Label(else_lbl));
                 if let Some(eb) = else_block {
                     for s in eb {
-                        let mut inner = lower_stmt_to_ir(s, locals, next_local, next_label)?;
+                        let mut inner = lower_stmt_to_ir(
+                            s,
+                            locals,
+                            next_local,
+                            next_label,
+                            break_lbl,
+                            continue_lbl,
+                        )?;
                         res.append(&mut inner);
                     }
                 }
@@ -281,9 +358,90 @@ pub fn compile_project(
                 lower_expr_to_ir(cond, &mut res, locals, next_label)?;
                 res.push(IrInstr::JumpIfFalse(end_lbl));
                 for s in body {
-                    let mut inner = lower_stmt_to_ir(s, locals, next_local, next_label)?;
+                    let mut inner = lower_stmt_to_ir(
+                        s,
+                        locals,
+                        next_local,
+                        next_label,
+                        Some(end_lbl),
+                        Some(start_lbl),
+                    )?;
                     res.append(&mut inner);
                 }
+                res.push(IrInstr::Jump(start_lbl));
+                res.push(IrInstr::Label(end_lbl));
+                Ok(res)
+            }
+            Stmt::For {
+                var,
+                iterable,
+                body,
+            } => {
+                let mut res = Vec::new();
+
+                let arr_local = if let Some(&i) = locals.get(var) {
+                    let i = *next_local;
+                    *next_local += 1;
+                    locals.insert(format!("{}_iter", var), i);
+                    i
+                } else {
+                    let i = *next_local;
+                    locals.insert(format!("{}_iter", var), i);
+                    *next_local += 1;
+                    i
+                };
+                let idx_local = *next_local;
+                *next_local += 1;
+                let var_local = if let Some(&i) = locals.get(var) {
+                    i
+                } else {
+                    let i = *next_local;
+                    locals.insert(var.clone(), i);
+                    *next_local += 1;
+                    i
+                };
+
+                lower_expr_to_ir(iterable, &mut res, locals, next_label)?;
+                res.push(IrInstr::StoreLocal(arr_local));
+
+                res.push(IrInstr::PushConst(0));
+                res.push(IrInstr::StoreLocal(idx_local));
+
+                let start_lbl = *next_label;
+                *next_label += 1;
+                let end_lbl = *next_label;
+                *next_label += 1;
+
+                res.push(IrInstr::Label(start_lbl));
+
+                res.push(IrInstr::LoadLocal(idx_local));
+                res.push(IrInstr::LoadLocal(arr_local));
+                res.push(IrInstr::Call("len".into(), 1));
+                res.push(IrInstr::Compare(crate::syntax::BinOp::Lt));
+                res.push(IrInstr::JumpIfFalse(end_lbl));
+
+                res.push(IrInstr::LoadLocal(arr_local));
+                res.push(IrInstr::LoadLocal(idx_local));
+                res.push(IrInstr::Call("array_get".into(), 2));
+                res.push(IrInstr::StoreLocal(var_local));
+
+                for s in body {
+                    let mut inner = lower_stmt_to_ir(
+                        s,
+                        locals,
+                        next_local,
+                        next_label,
+                        Some(end_lbl),
+                        Some(start_lbl),
+                    )?;
+                    res.append(&mut inner);
+                }
+
+                res.push(IrInstr::LoadLocal(idx_local));
+                res.push(IrInstr::PushConst(1));
+                res.push(IrInstr::BinOp(crate::syntax::BinOp::Add));
+                res.push(IrInstr::StoreLocal(idx_local));
+
                 res.push(IrInstr::Jump(start_lbl));
                 res.push(IrInstr::Label(end_lbl));
                 Ok(res)
@@ -294,7 +452,7 @@ pub fn compile_project(
                 res.push(IrInstr::Ret);
                 Ok(res)
             }
-            _ => Err("unsupported statement for lowering".into()),
+            _ => Err(format!("unsupported statement for lowering: {:?}", stmt).into()),
         }
     }
 
@@ -332,6 +490,8 @@ pub fn compile_project(
                     &mut locals_map,
                     &mut next_local_idx,
                     &mut next_label_for_funcs,
+                    None,
+                    None,
                 )
                 .map_err(|e| format!("lowering error in func {}: {}", name, e))?;
                 f_ir.append(&mut is);
@@ -358,6 +518,8 @@ pub fn compile_project(
             &mut locals,
             &mut next_local,
             &mut next_label_for_funcs,
+            None,
+            None,
         )
         .map_err(|e| format!("lowering error: {}", e))?;
         ir.append(&mut is);
@@ -399,8 +561,11 @@ pub fn compile_project(
             for instr in ir {
                 match instr {
                     IrInstr::BinOp(op) => {
-                        if let (Some(IrInstr::PushConst(b)), Some(IrInstr::PushConst(a))) =
-                            (stack.pop(), stack.pop())
+                        let b_opt = stack.pop();
+                        let a_opt = stack.pop();
+
+                        if let (Some(IrInstr::PushConst(a)), Some(IrInstr::PushConst(b))) =
+                            (&a_opt, &b_opt)
                         {
                             let res = match op {
                                 BinOp::Add => a + b,
@@ -408,14 +573,24 @@ pub fn compile_project(
                                 BinOp::Mul => a * b,
                                 BinOp::Div => a / b,
                                 _ => {
-                                    stack.push(IrInstr::PushConst(a));
-                                    stack.push(IrInstr::PushConst(b));
+                                    if let Some(a_instr) = a_opt {
+                                        stack.push(a_instr);
+                                    }
+                                    if let Some(b_instr) = b_opt {
+                                        stack.push(b_instr);
+                                    }
                                     stack.push(IrInstr::BinOp(op));
                                     continue;
                                 }
                             };
                             stack.push(IrInstr::PushConst(res));
                         } else {
+                            if let Some(a_instr) = a_opt {
+                                stack.push(a_instr);
+                            }
+                            if let Some(b_instr) = b_opt {
+                                stack.push(b_instr);
+                            }
                             stack.push(IrInstr::BinOp(op));
                         }
                     }
@@ -505,8 +680,8 @@ pub fn compile_project(
     }
 
     struct RelocEntry {
-        offset: u64,
-        sym: object::write::SymbolId,
+        offset: usize,
+        sym_name: Option<Vec<u8>>,
         is_call: bool,
     }
     let mut reloc_entries: Vec<RelocEntry> = Vec::new();
@@ -543,8 +718,8 @@ pub fn compile_project(
 
                 text.extend_from_slice(&[0x0F, 0x05]);
                 reloc_entries.push(RelocEntry {
-                    offset: imm64_off as u64,
-                    sym: sym_id,
+                    offset: imm64_off as usize,
+                    sym_name: Some(sym_name.into_bytes()),
                     is_call: false,
                 });
                 string_iter_idx += 1;
@@ -572,17 +747,38 @@ pub fn compile_project(
             IrInstr::EmitInt => {
                 text.push(0x5F);
 
+                text.push(0x53);
+                text.extend_from_slice(&[0x48, 0x81, 0xEC]);
+                text.write_i32::<LittleEndian>(0x80).unwrap();
+
+                text.extend_from_slice(&[0x48, 0x89, 0xE3]);
+
+                text.extend_from_slice(&[0x48, 0x81, 0xE4]);
+                text.write_u32::<LittleEndian>(0xFFFFFFF0u32).unwrap();
+
+                text.extend_from_slice(&[0x48, 0x89, 0xE6]);
+                text.extend_from_slice(&[0x48, 0x83, 0xEE, 0x40]);
+
                 text.extend_from_slice(&[0x48, 0xB8]);
                 let imm64_off = text.len();
                 text.write_u64::<LittleEndian>(0).unwrap();
 
                 text.extend_from_slice(&[0xFF, 0xD0]);
 
+                text.extend_from_slice(&[0x48, 0x89, 0xDC]);
+
+                text.extend_from_slice(&[0x48, 0x81, 0xC4]);
+                text.write_i32::<LittleEndian>(0x80).unwrap();
+                text.push(0x5B);
+
                 reloc_entries.push(RelocEntry {
-                    offset: imm64_off as u64,
-                    sym: print_sym_id,
+                    offset: imm64_off as usize,
+                    sym_name: Some(b"_print_i64".to_vec()),
                     is_call: false,
                 });
+            }
+            IrInstr::Pop => {
+                text.push(0x58);
             }
             IrInstr::BinOp(op) => {
                 text.push(0x5B);
@@ -683,73 +879,73 @@ pub fn compile_project(
             IrInstr::Call(name, nargs) => {
                 let num_reg = if nargs > 6 { 6 } else { nargs };
                 let stack_count = if nargs > 6 { nargs - 6 } else { 0 };
+                let use_pop_args = nargs <= 6;
+                let mut scratch_alloc: i32 = 0;
 
                 use byteorder::WriteBytesExt as _;
 
                 if nargs > 0 {
-                    let pad = if stack_count % 2 == 1 { 8 } else { 0 };
-
-                    use byteorder::WriteBytesExt as _;
-
-                    let total_alloc = (nargs as i32 * 8) + pad as i32;
-                    if total_alloc > 0 {
-                        text.extend_from_slice(&[0x48, 0x81, 0xEC]);
-                        text.write_i32::<LittleEndian>(total_alloc).unwrap();
-                    }
-
-                    for k in 0..nargs {
-                        let orig_off = ((nargs - 1 - k) as i32) * 8;
-                        let from_off = total_alloc + orig_off;
-
-                        text.extend_from_slice(&[0x48, 0x8B, 0x84, 0x24]);
-                        text.write_i32::<LittleEndian>(from_off).unwrap();
-
-                        let dest = (pad as i32) + (k as i32 * 8);
-                        text.extend_from_slice(&[0x48, 0x89, 0x84, 0x24]);
-                        text.write_i32::<LittleEndian>(dest).unwrap();
-                    }
-
-                    for i in 0..num_reg {
-                        let src_off = (pad as i32) + (i as i32 * 8);
-
-                        text.extend_from_slice(&[0x48, 0x8B, 0x84, 0x24]);
-                        text.write_i32::<LittleEndian>(src_off).unwrap();
-
-                        match i {
-                            0 => {
-                                text.extend_from_slice(&[0x48, 0x89, 0xC7]);
+                    if use_pop_args {
+                        for i in (0..nargs).rev() {
+                            match i {
+                                0 => text.push(0x5F),
+                                1 => text.push(0x5E),
+                                2 => text.push(0x5A),
+                                3 => text.push(0x59),
+                                4 => text.extend_from_slice(&[0x41, 0x58]),
+                                5 => text.extend_from_slice(&[0x41, 0x59]),
+                                _ => {}
                             }
-                            1 => {
-                                text.extend_from_slice(&[0x48, 0x89, 0xC6]);
-                            }
-                            2 => {
-                                text.extend_from_slice(&[0x48, 0x89, 0xC2]);
-                            }
-                            3 => {
-                                text.extend_from_slice(&[0x48, 0x89, 0xC1]);
-                            }
-                            4 => {
-                                text.extend_from_slice(&[0x49, 0x89, 0xC0]);
-                            }
-                            5 => {
-                                text.extend_from_slice(&[0x49, 0x89, 0xC1]);
-                            }
-                            _ => {}
                         }
-                    }
+                    } else {
+                        let pad = if stack_count % 2 == 1 { 8 } else { 0 };
 
-                    for j in (num_reg..nargs).rev() {
-                        let src_off = (pad as i32) + (j as i32 * 8);
+                        use byteorder::WriteBytesExt as _;
 
-                        text.extend_from_slice(&[0x48, 0x8B, 0x84, 0x24]);
-                        text.write_i32::<LittleEndian>(src_off).unwrap();
+                        scratch_alloc = (nargs as i32 * 8) + pad as i32;
+                        if scratch_alloc > 0 {
+                            text.extend_from_slice(&[0x48, 0x81, 0xEC]);
+                            text.write_i32::<LittleEndian>(scratch_alloc).unwrap();
+                        }
 
-                        text.push(0x50);
-                    }
+                        for k in 0..nargs {
+                            let orig_off = ((nargs - 1 - k) as i32) * 8;
+                            let from_off = scratch_alloc + orig_off;
 
-                    if total_alloc > 0 {
-                        text.extend_from_slice(&[0x48, 0x81, 0xC4]);
-                        text.write_i32::<LittleEndian>(total_alloc).unwrap();
+                            text.extend_from_slice(&[0x48, 0x8B, 0x84, 0x24]);
+                            text.write_i32::<LittleEndian>(from_off).unwrap();
+
+                            let dest = (pad as i32) + (k as i32 * 8);
+                            text.extend_from_slice(&[0x48, 0x89, 0x84, 0x24]);
+                            text.write_i32::<LittleEndian>(dest).unwrap();
+                        }
+
+                        for i in 0..num_reg {
+                            let src_off = (pad as i32) + (i as i32 * 8);
+
+                            text.extend_from_slice(&[0x48, 0x8B, 0x84, 0x24]);
+                            text.write_i32::<LittleEndian>(src_off).unwrap();
+
+                            match i {
+                                0 => text.extend_from_slice(&[0x48, 0x89, 0xC7]),
+                                1 => text.extend_from_slice(&[0x48, 0x89, 0xC6]),
+                                2 => text.extend_from_slice(&[0x48, 0x89, 0xC2]),
+                                3 => text.extend_from_slice(&[0x48, 0x89, 0xC1]),
+                                4 => text.extend_from_slice(&[0x49, 0x89, 0xC0]),
+                                5 => text.extend_from_slice(&[0x49, 0x89, 0xC1]),
+                                _ => {}
+                            }
+                        }
+
+                        text.extend_from_slice(&[0x4C, 0x8B, 0xDC]);
+                        for j in (num_reg..nargs).rev() {
+                            let src_off = (pad as i32) + (j as i32 * 8);
+
+                            text.extend_from_slice(&[0x49, 0x8B, 0x83]);
+                            text.write_i32::<LittleEndian>(src_off).unwrap();
+
+                            text.push(0x50);
+                        }
                     }
                 }
 
@@ -762,7 +958,9 @@ pub fn compile_project(
                     text.extend_from_slice(&[0x48, 0xB8]);
                     let imm64_off = text.len();
                     text.write_u64::<LittleEndian>(0).unwrap();
+
                     text.extend_from_slice(&[0xFF, 0xD0]);
+
                     let sym_id = if let Some(sid) = obj.symbol_id(name.as_bytes()) {
                         sid
                     } else {
@@ -779,16 +977,28 @@ pub fn compile_project(
                         obj.add_symbol(sym)
                     };
                     reloc_entries.push(RelocEntry {
-                        offset: imm64_off as u64,
-                        sym: sym_id,
+                        offset: imm64_off as usize,
+                        sym_name: Some(name.as_bytes().to_vec()),
                         is_call: false,
                     });
                 }
 
-                if stack_count > 0 {
-                    text.extend_from_slice(&[0x48, 0x81, 0xC4]);
-                    text.write_i32::<LittleEndian>((stack_count as i32 * 8))
-                        .unwrap();
+                if !use_pop_args {
+                    if stack_count > 0 {
+                        text.extend_from_slice(&[0x48, 0x81, 0xC4]);
+                        text.write_i32::<LittleEndian>((stack_count as i32 * 8))
+                            .unwrap();
+                    }
+
+                    if scratch_alloc > 0 {
+                        text.extend_from_slice(&[0x48, 0x81, 0xC4]);
+                        text.write_i32::<LittleEndian>(scratch_alloc).unwrap();
+                    }
+
+                    if nargs > 0 {
+                        text.extend_from_slice(&[0x48, 0x81, 0xC4]);
+                        text.write_i32::<LittleEndian>((nargs as i32 * 8)).unwrap();
+                    }
                 }
 
                 text.push(0x50);
@@ -823,19 +1033,6 @@ pub fn compile_project(
     }
 
     let text_off = obj.append_section_data(text_id, &text, 16);
-
-    for r in reloc_entries {
-        let reloc = Relocation {
-            offset: text_off + r.offset,
-            size: 64,
-            kind: RelocationKind::Absolute,
-            encoding: RelocationEncoding::Generic,
-            symbol: r.sym,
-            addend: 0,
-        };
-        obj.add_relocation(text_id, reloc)
-            .map_err(|e| format!("reloc add error: {}", e))?;
-    }
 
     for (fname, _pcount, _f_ir, _loc_count, lbl) in function_infos.iter() {
         if let Some(pos) = label_positions.get(lbl) {
@@ -875,126 +1072,240 @@ pub fn compile_project(
     std::fs::write(&obj_path, &obj_bytes)
         .map_err(|e| format!("Failed to write object file: {}", e))?;
 
-    let helper_s = r#"
-    .text
-    .global _print_i64
-    .type _print_i64, @function
-_print_i64:
-    pushq %rbp
-    movq %rsp, %rbp
-    pushq %rbx
-    pushq %r12
-    pushq %r13
-    subq $32, %rsp
-    movq %rdi, %rax
-    leaq (%rsp), %rsi
-    movq $0, %rcx
-    movq %rax, %r12
-    cmpq $0, %r12
-    jge .Lpos
-    negq %r12
-    movb $1, %r13b
-.Lpos:
-    movq $0, %rdx
-.Lloop:
-    movq $10, %rbx
-    cqo
-    idivq %rbx
-    addb $'0', %dl
-    movb %dl, (%rsi,%rcx,1)
-    incq %rcx
-    cmpq $0, %rax
-    jne .Lloop
-    cmpb $0, %r13b
-    je .Lskip_minus
-    movb $'-', (%rsi,%rcx)
-    incq %rcx
-.Lskip_minus:
-    movq $0, %rdx
-    leaq (%rsi,%rcx,1), %rdi
-    decq %rdi
-.Lrev_loop:
-    leaq (%rsi,%rdx,1), %r8
-    cmpq %rdi, %r8
-    jge .Lrev_done
-    movb (%rsi,%rdx,1), %al
-    movb (%rdi), %bl
-    movb %bl, (%rsi,%rdx,1)
-    movb %al, (%rdi)
-    incq %rdx
-    decq %rdi
-    jmp .Lrev_loop
-.Lrev_done:
-    movq $1, %rax
-    movq $1, %rdi
-    movq %rsi, %rsi
-    movq %rcx, %rdx
-    syscall
-    addq $32, %rsp
-    popq %r13
-    popq %r12
-    popq %rbx
-    popq %rbp
-    ret
-    "#;
-    let helper_s_path = out_dir.join("_print_i64.s");
-    std::fs::write(&helper_s_path, helper_s)
-        .map_err(|e| format!("failed to write helper asm: {}", e))?;
+    let helpers: std::collections::BTreeMap<&str, Vec<u8>> = {
+        let mut m = std::collections::BTreeMap::new();
 
-    let helper_o = out_dir.join("_print_i64.o");
-    let as_out = Command::new("as")
-        .arg(&helper_s_path)
-        .arg("-o")
-        .arg(&helper_o)
-        .output()
-        .map_err(|e| format!("failed to run as: {}", e))?;
-    if !as_out.status.success() {
-        return Err(format!(
-            "as failed: {}\nstderr: {}",
-            as_out.status,
-            String::from_utf8_lossy(&as_out.stderr)
-        ));
+        m.insert(
+            "_print_i64",
+            vec![
+                0x55, 0x48, 0x89, 0xe5, 0x53, 0x41, 0x54, 0x41, 0x55, 0x48, 0x83, 0xec, 0x20, 0x48,
+                0x89, 0xf8, 0x90, 0x90, 0x90, 0x90, 0x48, 0xc7, 0xc1, 0x00, 0x00, 0x00, 0x00, 0x49,
+                0x89, 0xc4, 0x49, 0x83, 0xfc, 0x00, 0x7d, 0x06, 0x49, 0xf7, 0xdc, 0x41, 0xb5, 0x01,
+                0x48, 0xc7, 0xc2, 0x00, 0x00, 0x00, 0x00, 0x48, 0xc7, 0xc3, 0x0a, 0x00, 0x00, 0x00,
+                0x48, 0x99, 0x48, 0xf7, 0xfb, 0x80, 0xc2, 0x30, 0x88, 0x14, 0x0e, 0x48, 0xff, 0xc1,
+                0x48, 0x83, 0xf8, 0x00, 0x75, 0xe5, 0x41, 0x80, 0xfd, 0x00, 0x74, 0x07, 0xc6, 0x04,
+                0x0e, 0x2d, 0x48, 0xff, 0xc1, 0x48, 0xc7, 0xc2, 0x00, 0x00, 0x00, 0x00, 0x48, 0x8d,
+                0x3c, 0x0e, 0x48, 0xff, 0xcf, 0x4c, 0x8d, 0x04, 0x16, 0x49, 0x39, 0xf8, 0x7d, 0x12,
+                0x8a, 0x04, 0x16, 0x8a, 0x1f, 0x88, 0x1c, 0x16, 0x88, 0x07, 0x48, 0xff, 0xc2, 0x48,
+                0xff, 0xcf, 0xeb, 0xe5, 0x48, 0xc7, 0xc0, 0x01, 0x00, 0x00, 0x00, 0x48, 0xc7, 0xc7,
+                0x01, 0x00, 0x00, 0x00, 0x48, 0x89, 0xf6, 0x48, 0x89, 0xca, 0x0f, 0x05, 0x48, 0x83,
+                0xc4, 0x20, 0x41, 0x5d, 0x41, 0x5c, 0x5b, 0x5d, 0xc3, 0x55, 0x48, 0x89, 0xe5, 0x53,
+                0x41, 0x54, 0x41, 0x55, 0x48, 0x83, 0xec, 0x20, 0x48, 0xc7, 0xc7, 0x00, 0x00, 0x00,
+                0x00, 0x48, 0xc7, 0xc6, 0x10, 0x00, 0x00, 0x00, 0x48, 0xc7, 0xc2, 0x03, 0x00, 0x00,
+                0x00, 0x49, 0xc7, 0xc2, 0x22, 0x00, 0x00, 0x00, 0x4d, 0x31, 0xc0, 0x4d, 0x31, 0xc9,
+                0x48, 0xc7, 0xc0, 0x09, 0x00, 0x00, 0x00, 0x0f, 0x05, 0x48, 0xc7, 0x00, 0xc7, 0x40,
+                0x08, 0x00, 0x00, 0x00, 0x00, 0x48, 0x83, 0xc4, 0x20, 0x41, 0x5d, 0x41, 0x5c, 0x5b,
+                0x5d, 0xc3, 0x55, 0x48, 0x89, 0xe5, 0x53, 0x41, 0x54, 0x41, 0x55, 0x41, 0x56, 0x41,
+                0x57, 0x48, 0x83, 0xec, 0x20, 0x49, 0x89, 0xfc, 0x49, 0x89, 0xf6, 0x49, 0x8b, 0x1c,
+                0x24, 0x4d, 0x8b, 0x6c, 0x24, 0x08, 0x48, 0xc7, 0xc7, 0x00, 0x00, 0x00, 0x00, 0x48,
+                0xc7, 0xc6, 0x10, 0x00, 0x00, 0x00, 0x48, 0xc7, 0xc2, 0x03, 0x00, 0x00, 0x00, 0x49,
+                0xc7, 0xc2, 0x22, 0x00, 0x00, 0x00, 0x4d, 0x31, 0xc0, 0x4d, 0x31, 0xc9, 0x48, 0xc7,
+                0xc0, 0x09, 0x00, 0x00, 0x00, 0x0f, 0x05, 0x4c, 0x89, 0x30, 0x48, 0xc7, 0x40, 0x08,
+                0x00, 0x00, 0x00, 0x00, 0x49, 0x83, 0xfd, 0x00, 0x74, 0x12, 0x4d, 0x89, 0xef, 0x4d,
+                0x8b, 0x7f, 0x08, 0x4d, 0x85, 0xff, 0x75, 0xf7, 0x49, 0x89, 0x45, 0x08, 0xeb, 0x05,
+                0x49, 0x89, 0x44, 0x24, 0x08, 0x49, 0xff, 0x04, 0x24, 0x4c, 0x89, 0xe0, 0x48, 0x83,
+                0xc4, 0x20, 0x41, 0x5f, 0x41, 0x5e, 0x41, 0x5d, 0x41, 0x5c, 0x5b, 0x5d, 0xc3, 0x55,
+                0x48, 0x89, 0xe5, 0x53, 0x48, 0x83, 0xec, 0x10, 0x48, 0x8b, 0x47, 0x08, 0x48, 0x85,
+                0xc0, 0x74, 0x20, 0x48, 0x89, 0xf3, 0x48, 0x85, 0xdb, 0x74, 0x0e, 0x48, 0x8b, 0x40,
+                0x08, 0x48, 0x85, 0xc0, 0x74, 0x0f, 0x48, 0xff, 0xcb, 0xeb, 0xed, 0x48, 0x8b, 0x00,
+                0x48, 0x83, 0xc4, 0x10, 0x5b, 0x5d, 0xc3,
+            ],
+        );
+
+        m.insert(
+            "array_new",
+            vec![
+                0x55, 0x48, 0x89, 0xe5, 0x53, 0x41, 0x54, 0x41, 0x55, 0x48, 0x83, 0xec, 0x20, 0x48,
+                0xc7, 0xc7, 0x00, 0x00, 0x00, 0x00, 0x48, 0xc7, 0xc6, 0x10, 0x00, 0x00, 0x00, 0x48,
+                0xc7, 0xc2, 0x03, 0x00, 0x00, 0x00, 0x49, 0xc7, 0xc2, 0x22, 0x00, 0x00, 0x00, 0x4d,
+                0x31, 0xc0, 0x4d, 0x31, 0xc9, 0x48, 0xc7, 0xc0, 0x09, 0x00, 0x00, 0x00, 0x0f, 0x05,
+                0x48, 0xc7, 0x00, 0x00, 0x00, 0x00, 0x00, 0x48, 0xc7, 0x40, 0x08, 0x00, 0x00, 0x00,
+                0x00, 0x48, 0x83, 0xc4, 0x20, 0x41, 0x5d, 0x41, 0x5c, 0x5b, 0x5d, 0xc3,
+            ],
+        );
+
+        m.insert(
+            "push",
+            vec![
+                0x55, 0x48, 0x89, 0xe5, 0x53, 0x41, 0x54, 0x41, 0x55, 0x41, 0x56, 0x41, 0x57, 0x49,
+                0x89, 0xfc, 0x49, 0x89, 0xf5, 0x48, 0xc7, 0xc7, 0x00, 0x00, 0x00, 0x00, 0x48, 0xc7,
+                0xc6, 0x20, 0x00, 0x00, 0x00, 0x48, 0xc7, 0xc2, 0x03, 0x00, 0x00, 0x00, 0x49, 0xc7,
+                0xc2, 0x22, 0x00, 0x00, 0x00, 0x49, 0xc7, 0xc0, 0xff, 0xff, 0xff, 0xff, 0x4d, 0x31,
+                0xc9, 0x48, 0xc7, 0xc0, 0x09, 0x00, 0x00, 0x00, 0x0f, 0x05, 0x49, 0x89, 0xc6, 0x4d,
+                0x89, 0x2e, 0x49, 0xc7, 0x46, 0x08, 0x00, 0x00, 0x00, 0x00, 0x49, 0x8b, 0x5c, 0x24,
+                0x08, 0x48, 0x85, 0xdb, 0x74, 0x14, 0x48, 0x8b, 0x43, 0x08, 0x48, 0x85, 0xc0, 0x74,
+                0x05, 0x48, 0x89, 0xc3, 0xeb, 0xf2, 0x4c, 0x89, 0x73, 0x08, 0xeb, 0x05, 0x4d, 0x89,
+                0x74, 0x24, 0x08, 0x49, 0x8b, 0x04, 0x24, 0x48, 0x83, 0xc0, 0x01, 0x49, 0x89, 0x04,
+                0x24, 0x4c, 0x89, 0xe0, 0x41, 0x5f, 0x41, 0x5e, 0x41, 0x5d, 0x41, 0x5c, 0x5b, 0x5d,
+                0xc3,
+            ],
+        );
+
+        m.insert(
+            "array_get",
+            vec![
+                0x55, 0x48, 0x89, 0xe5, 0x53, 0x48, 0x83, 0xec, 0x10, 0x48, 0x8b, 0x47, 0x08, 0x48,
+                0x85, 0xc0, 0x74, 0x20, 0x48, 0x89, 0xf3, 0x48, 0x85, 0xdb, 0x74, 0x0e, 0x48, 0x8b,
+                0x40, 0x08, 0x48, 0x85, 0xc0, 0x74, 0x0f, 0x48, 0xff, 0xcb, 0xeb, 0xed, 0x48, 0x8b,
+                0x00, 0x48, 0x83, 0xc4, 0x10, 0x5b, 0x5d, 0xc3, 0x48, 0xc7, 0xc0, 0x00, 0x00, 0x00,
+                0x00, 0x48, 0x83, 0xc4, 0x10, 0x5b, 0x5d, 0xc3,
+            ],
+        );
+
+        m.insert(
+            "array_set",
+            vec![
+                0x55, 0x48, 0x89, 0xe5, 0x53, 0x48, 0x83, 0xec, 0x10, 0x48, 0x8b, 0x47, 0x08, 0x48,
+                0x89, 0xf3, 0x48, 0x85, 0xdb, 0x74, 0x0e, 0x48, 0x8b, 0x40, 0x08, 0x48, 0x85, 0xc0,
+                0x74, 0x08, 0x48, 0xff, 0xcb, 0xeb, 0xed, 0x48, 0x89, 0x10, 0x48, 0xc7, 0xc0, 0x00,
+                0x00, 0x00, 0x00, 0x48, 0x83, 0xc4, 0x10, 0x5b, 0x5d, 0xc3,
+            ],
+        );
+
+        m.insert(
+            "len",
+            vec![0x55, 0x48, 0x89, 0xe5, 0x48, 0x8b, 0x07, 0x5d, 0xc3],
+        );
+
+        m.insert(
+            "early_stop",
+            vec![
+                0xB8, 0x27, 0x00, 0x00, 0x00, 0x0F, 0x05, 0x48, 0x89, 0xC7, 0xBE, 0x13, 0x00, 0x00,
+                0x00, 0xB8, 0x3E, 0x00, 0x00, 0x00, 0x0F, 0x05, 0xC3,
+            ],
+        );
+
+        m
+    };
+
+    let mut helper_pos: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    for (name, bytes) in helpers.iter() {
+        let pos = text.len();
+        text.extend_from_slice(bytes);
+        helper_pos.insert(name.to_string(), pos);
     }
+
+    let base_vaddr: u64 = 0x400000;
+    let file_text_off: usize = 0x1000;
+
+    for r in reloc_entries.iter() {
+        let sym_name = r
+            .sym_name
+            .as_ref()
+            .ok_or_else(|| "missing symbol name for relocation".to_string())?;
+        let sym = String::from_utf8_lossy(sym_name).into_owned();
+        let sym_pos_opt = if let Some(p) = helper_pos.get(sym.as_str()) {
+            Some(*p)
+        } else if sym.starts_with(".str.") {
+            if let Ok(idx) = sym[5..].parse::<usize>() {
+                if idx < string_positions.len() {
+                    Some(text.len() + string_positions[idx])
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else if let Some(lbl) = func_label_map.get(&sym) {
+            label_positions.get(lbl).cloned()
+        } else if sym == "_start" {
+            Some(0usize)
+        } else {
+            None
+        };
+        let pos = sym_pos_opt.ok_or_else(|| format!("undefined symbol in relocation: {}", sym))?;
+        let addr = base_vaddr + (file_text_off as u64) + (pos as u64);
+        let off = r.offset;
+        let mut le = (addr).to_le_bytes();
+        if off + 8 > text.len() {
+            return Err(format!(
+                "relocation offset out of range: {} > {}",
+                off + 8,
+                text.len()
+            )
+            .into());
+        }
+        text[off..off + 8].copy_from_slice(&le);
+    }
+
+    use std::io::Write as _;
+    fn write_u16(buf: &mut Vec<u8>, v: u16) {
+        buf.extend_from_slice(&v.to_le_bytes());
+    }
+    fn write_u32(buf: &mut Vec<u8>, v: u32) {
+        buf.extend_from_slice(&v.to_le_bytes());
+    }
+    fn write_u64(buf: &mut Vec<u8>, v: u64) {
+        buf.extend_from_slice(&v.to_le_bytes());
+    }
+
+    let mut elf: Vec<u8> = Vec::new();
+
+    elf.extend_from_slice(&[0x7f, b'E', b'L', b'F']);
+    elf.push(2);
+    elf.push(1);
+    elf.push(1);
+    elf.extend_from_slice(&[0u8; 9]);
+    write_u16(&mut elf, 2);
+    write_u16(&mut elf, 0x3e);
+    write_u32(&mut elf, 1);
+
+    let entry_addr = base_vaddr + (file_text_off as u64);
+    write_u64(&mut elf, entry_addr);
+
+    let phoff = 64u64;
+    write_u64(&mut elf, phoff);
+    write_u64(&mut elf, 0);
+    write_u32(&mut elf, 0);
+    write_u16(&mut elf, 64);
+    write_u16(&mut elf, 56);
+    write_u16(&mut elf, 1);
+    write_u16(&mut elf, 0);
+    write_u16(&mut elf, 0);
+    write_u16(&mut elf, 0);
+
+    write_u32(&mut elf, 1);
+
+    write_u32(&mut elf, 7);
+
+    write_u64(&mut elf, file_text_off as u64);
+
+    write_u64(&mut elf, base_vaddr + (file_text_off as u64));
+
+    write_u64(&mut elf, base_vaddr + (file_text_off as u64));
+
+    let filesz = (text.len() + rodata.len()) as u64;
+    write_u64(&mut elf, filesz);
+    write_u64(&mut elf, filesz);
+
+    write_u64(&mut elf, 0x1000);
+
+    if elf.len() > file_text_off {
+        return Err("ELF headers too large".into());
+    }
+    let mut file_bytes: Vec<u8> = elf;
+    file_bytes.resize(file_text_off, 0);
+
+    file_bytes.extend_from_slice(&text);
+    file_bytes.extend_from_slice(&rodata);
 
     let exe_path = out_dir.join(proj_name);
-    let mut cmd = Command::new("ld");
-    cmd.arg(&obj_path)
-        .arg(&helper_o)
-        .arg("-o")
-        .arg(&exe_path)
-        .arg("--entry=_start");
-
-    let out = cmd
-        .output()
-        .map_err(|e| format!("failed to spawn ld: {}", e))?;
-    if !out.status.success() {
-        return Err(format!(
-            "ld failed: {}\nstderr: {}",
-            out.status,
-            String::from_utf8_lossy(&out.stderr)
-        ));
+    {
+        use std::io::Write;
+        let mut f =
+            std::fs::File::create(&exe_path).map_err(|e| format!("failed to create exe: {}", e))?;
+        f.write_all(&file_bytes)
+            .map_err(|e| format!("failed to write exe: {}", e))?;
+        f.sync_all()
+            .map_err(|e| format!("failed to sync exe: {}", e))?;
     }
 
-    if !exe_path.exists() {
-        let mut entries = Vec::new();
-        if let Ok(rd) = std::fs::read_dir(&out_dir) {
-            for e in rd.flatten() {
-                entries.push(e.file_name().to_string_lossy().into_owned());
-            }
-        }
-        return Err(format!(
-            "linker reported success but executable '{}' not found; out_dir entries: {:?}",
-            exe_path.display(),
-            entries
-        ));
-    }
-
-    let mut perms = std::fs::metadata(&exe_path)
-        .map_err(|e| format!("stat failed: {}", e))?
-        .permissions();
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
+        let mut perms = std::fs::metadata(&exe_path)
+            .map_err(|e| format!("stat failed: {}", e))?
+            .permissions();
         perms.set_mode(0o755);
         std::fs::set_permissions(&exe_path, perms)
             .map_err(|e| format!("set_permissions failed: {}", e))?;
@@ -1283,5 +1594,44 @@ mod tests {
             String::from_utf8_lossy(&out.stdout),
             "args 1 2 3 4 5 6 7 8\n36\n"
         );
+    }
+
+    #[test]
+    fn debug_array_run() {
+        let td = tempdir().expect("tempdir");
+        let pd = td.path();
+        fs::create_dir_all(pd.join("src")).expect("mkdir");
+        fs::write(
+            pd.join("src/main.sd"),
+            "fn new main/\n    let mut a = []/array\n    push(a, 'H')/unit\n    push(a, 'i')/unit\n    println(\"{} {}\", a[0], a[1])/unit\nfn/",
+        )
+        .expect("write src");
+        fs::write(
+            pd.join("shiden.toml"),
+            r#"[project]\nname = "test"\n[build]\ntargets = ["x86_64-linux"]"#,
+        )
+        .expect("write mf");
+
+        let exe = compile_project(pd, "test", "x86_64-linux", None).expect("compile");
+        println!("exe path: {}", exe.display());
+
+        let _ = std::fs::copy(&exe, std::path::Path::new("/tmp/shiden_debug_exe"));
+        let objdump = Command::new("objdump").arg("-d").arg(&exe).output().ok();
+        if let Some(od) = objdump {
+            println!("objdump stdout:\n{}", String::from_utf8_lossy(&od.stdout));
+            println!("objdump stderr:\n{}", String::from_utf8_lossy(&od.stderr));
+        }
+
+        let out = Command::new(&exe).output().expect("run exe");
+
+        println!(
+            "status: {:?}\nstdout: {}\nstderr: {}",
+            out.status,
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+
+        assert!(out.status.success());
+        assert_eq!(String::from_utf8_lossy(&out.stdout), "72 105\n");
     }
 }

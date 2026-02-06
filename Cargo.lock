@@ -400,6 +400,7 @@ version = "0.1.0"
 dependencies = [
  "byteorder",
  "clap",
+ "libc",
  "object",
  "serde",
  "serde_json",

@@ -881,7 +881,7 @@ mod tests {
 
     #[test]
     fn debug_parse_brainfuck_example() {
-        let src = std::fs::read_to_string("examples/brainfuck.sd").expect("read example");
+        let src = std::fs::read_to_string("examples/src/main.sd").expect("read example");
         let mut p = Parser::new(&src);
         loop {
             println!("CUR {:?} PEEK {:?}", p.cur, p.peek);
@@ -898,7 +898,7 @@ mod tests {
 
     #[test]
     fn debug_parse_brainfuck_function() {
-        let src = std::fs::read_to_string("examples/brainfuck.sd").expect("read example");
+        let src = std::fs::read_to_string("examples/src/main.sd").expect("read example");
         let mut p = Parser::new(&src);
 
         while !(matches!(&p.cur, Token::Fn) && matches!(&p.peek, Token::New)) {
