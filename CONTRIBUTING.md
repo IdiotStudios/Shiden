@@ -30,7 +30,7 @@
 - [ ] Updated docs when appropriate.
 - [ ] Provide a clear PR description.
 
-## Licensing & legal
+## Licensing
 
 By contributing you agree that your changes will be licensed under the repo's MIT license, see `LICENSE`.
 
