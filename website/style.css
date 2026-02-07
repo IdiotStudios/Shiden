@@ -1,11 +1,11 @@
 * {box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  background: #6a5192;
-  /*background: linear-gradient(180deg, rgba(14, 18, 35, 1) 0%, rgba(30, 30, 59, 1) 50%);*/
+  background: #4c396b;
+  background: linear-gradient(180deg, #4c396b 0%, #6a3477 50%);
   --text-color: #e0e0e0;
   --color-text-light: var(--text-color);
-  --color-primary: #6a5192;
-  --color-secondary: #45355f;
+  --color-primary: #6a3477 ;
+  --color-secondary: #4c396b;
   --code-bg: #1e1e1e;
   --font-main: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   --font-code: 'Fira Code', 'Courier New', monospace;
@@ -66,7 +66,7 @@ button { width: 140px; padding: 12px 0; margin: 12px 8px 0 8px; border: none; bo
 ul { list-style: none;  padding-left: 0; margin-top: 1rem; margin-bottom: 1rem; }
 li { position: relative; padding-left: 1.5rem; margin-bottom: 0.75rem; line-height: 1;}
 li:before {
-  content: "> ";
+  content: "— ";
   padding-right: 5px;
 }
 
