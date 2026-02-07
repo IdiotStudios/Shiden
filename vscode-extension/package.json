@@ -32,7 +32,7 @@
     ]
   },
   "description": "Syntax highlighting for the Shiden language (TextMate grammar only)",
-  "icon": "images/icon.png",
+  "icon": "images/icon-256x256.png",
   "homepage": "https://github.com/IdiotStudios/shiden",
   "bugs": {
     "url": "https://github.com/IdiotStudios/shiden/issues"
