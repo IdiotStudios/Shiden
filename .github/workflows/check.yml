@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'src/**'
+      - 'examples/**'
+      - 'tests/**'
+      - 'rewrite/**'
+      - 'Cargo.toml'
   workflow_dispatch:
 
 permissions:
