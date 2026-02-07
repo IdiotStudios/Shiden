@@ -1,11 +1,11 @@
 * {box-sizing: border-box; margin: 0; padding: 0; }
 :root {
-  background: #521a80;
+  background: #6a5192;
   /*background: linear-gradient(180deg, rgba(14, 18, 35, 1) 0%, rgba(30, 30, 59, 1) 50%);*/
   --text-color: #e0e0e0;
   --color-text-light: var(--text-color);
-  --color-primary: #8A2BE2;
-  --color-secondary: #9933FF;
+  --color-primary: #6a5192;
+  --color-secondary: #45355f;
   --code-bg: #1e1e1e;
   --font-main: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   --font-code: 'Fira Code', 'Courier New', monospace;
