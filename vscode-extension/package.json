@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/IdiotStudios/shiden.git"
   },
-  "version": "0.1.0",
+  "version": "0.1.1",
   "engines": {
     "vscode": "^1.60.0"
   },
@@ -32,7 +32,7 @@
     ]
   },
   "description": "Syntax highlighting for the Shiden language (TextMate grammar only)",
-  "icon": "images/icon-256x256.png",
+  "icon": "images/logo-256x256.png",
   "homepage": "https://github.com/IdiotStudios/shiden",
   "bugs": {
     "url": "https://github.com/IdiotStudios/shiden/issues"
