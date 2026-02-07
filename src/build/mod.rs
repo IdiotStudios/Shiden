@@ -81,6 +81,7 @@ pub fn compile_project(
         e: &crate::syntax::Expr,
         out: &mut Vec<IrInstr>,
         locals: &mut std::collections::HashMap<String, usize>,
+        next_local: &mut usize,
         next_label: &mut usize,
     ) -> Result<(), String> {
         use crate::syntax::*;
@@ -104,20 +105,20 @@ pub fn compile_project(
             }
             Expr::Call { name, args } => {
                 for a in args {
-                    lower_expr_to_ir(a, out, locals, next_label)?;
+                    lower_expr_to_ir(a, out, locals, next_local, next_label)?;
                 }
                 out.push(IrInstr::Call(name.clone(), args.len()));
                 Ok(())
             }
             Expr::Unary { op, expr } => match op {
                 UnaryOp::Neg => {
-                    lower_expr_to_ir(expr, out, locals, next_label)?;
+                    lower_expr_to_ir(expr, out, locals, next_local, next_label)?;
                     out.push(IrInstr::PushConst(-1));
                     out.push(IrInstr::BinOp(BinOp::Mul));
                     Ok(())
                 }
                 UnaryOp::Not => {
-                    lower_expr_to_ir(expr, out, locals, next_label)?;
+                    lower_expr_to_ir(expr, out, locals, next_local, next_label)?;
                     out.push(IrInstr::PushConst(0));
                     out.push(IrInstr::Compare(BinOp::Eq));
                     Ok(())
@@ -127,14 +128,95 @@ pub fn compile_project(
                 use crate::syntax::BinOp::*;
                 match op {
                     Add | Sub | Mul | Div => {
-                        lower_expr_to_ir(left, out, locals, next_label)?;
-                        lower_expr_to_ir(right, out, locals, next_label)?;
+                        lower_expr_to_ir(left, out, locals, next_local, next_label)?;
+                        lower_expr_to_ir(right, out, locals, next_local, next_label)?;
                         out.push(IrInstr::BinOp(op.clone()));
                         Ok(())
                     }
                     Eq | Ne | Lt | Le | Gt | Ge => {
-                        lower_expr_to_ir(left, out, locals, next_label)?;
-                        lower_expr_to_ir(right, out, locals, next_label)?;
+                        let is_string_compare = matches!(op, Eq | Ne)
+                            && (matches!(left.as_ref(), Expr::StringLiteral(_))
+                                || matches!(right.as_ref(), Expr::StringLiteral(_)));
+                        if is_string_compare {
+                            let left_tmp = *next_local;
+                            *next_local += 1;
+                            let right_tmp = *next_local;
+                            *next_local += 1;
+                            let len_left = *next_local;
+                            *next_local += 1;
+                            let len_right = *next_local;
+                            *next_local += 1;
+                            let idx_tmp = *next_local;
+                            *next_local += 1;
+
+                            lower_expr_to_ir(left, out, locals, next_local, next_label)?;
+                            out.push(IrInstr::StoreLocal(left_tmp));
+                            lower_expr_to_ir(right, out, locals, next_local, next_label)?;
+                            out.push(IrInstr::StoreLocal(right_tmp));
+
+                            out.push(IrInstr::LoadLocal(left_tmp));
+                            out.push(IrInstr::Call("len".into(), 1));
+                            out.push(IrInstr::StoreLocal(len_left));
+                            out.push(IrInstr::LoadLocal(right_tmp));
+                            out.push(IrInstr::Call("len".into(), 1));
+                            out.push(IrInstr::StoreLocal(len_right));
+
+                            out.push(IrInstr::LoadLocal(len_left));
+                            out.push(IrInstr::LoadLocal(len_right));
+                            out.push(IrInstr::Compare(Eq));
+
+                            let mismatch_lbl = *next_label;
+                            *next_label += 1;
+                            let loop_lbl = *next_label;
+                            *next_label += 1;
+                            let done_lbl = *next_label;
+                            *next_label += 1;
+                            let end_lbl = *next_label;
+                            *next_label += 1;
+
+                            out.push(IrInstr::JumpIfFalse(mismatch_lbl));
+
+                            out.push(IrInstr::PushConst(0));
+                            out.push(IrInstr::StoreLocal(idx_tmp));
+                            out.push(IrInstr::Label(loop_lbl));
+
+                            out.push(IrInstr::LoadLocal(idx_tmp));
+                            out.push(IrInstr::LoadLocal(len_left));
+                            out.push(IrInstr::Compare(Lt));
+                            out.push(IrInstr::JumpIfFalse(done_lbl));
+
+                            out.push(IrInstr::LoadLocal(left_tmp));
+                            out.push(IrInstr::LoadLocal(idx_tmp));
+                            out.push(IrInstr::Call("array_get".into(), 2));
+                            out.push(IrInstr::LoadLocal(right_tmp));
+                            out.push(IrInstr::LoadLocal(idx_tmp));
+                            out.push(IrInstr::Call("array_get".into(), 2));
+                            out.push(IrInstr::Compare(Eq));
+                            out.push(IrInstr::JumpIfFalse(mismatch_lbl));
+
+                            out.push(IrInstr::LoadLocal(idx_tmp));
+                            out.push(IrInstr::PushConst(1));
+                            out.push(IrInstr::BinOp(Add));
+                            out.push(IrInstr::StoreLocal(idx_tmp));
+                            out.push(IrInstr::Jump(loop_lbl));
+
+                            out.push(IrInstr::Label(done_lbl));
+                            out.push(IrInstr::PushConst(1));
+                            out.push(IrInstr::Jump(end_lbl));
+
+                            out.push(IrInstr::Label(mismatch_lbl));
+                            out.push(IrInstr::PushConst(0));
+                            out.push(IrInstr::Label(end_lbl));
+
+                            if matches!(op, Ne) {
+                                out.push(IrInstr::PushConst(0));
+                                out.push(IrInstr::Compare(Eq));
+                            }
+                            return Ok(());
+                        }
+
+                        lower_expr_to_ir(left, out, locals, next_local, next_label)?;
+                        lower_expr_to_ir(right, out, locals, next_local, next_label)?;
                         out.push(IrInstr::Compare(op.clone()));
                         Ok(())
                     }
@@ -143,9 +225,9 @@ pub fn compile_project(
                         *next_label += 1;
                         let end_lbl = *next_label;
                         *next_label += 1;
-                        lower_expr_to_ir(left, out, locals, next_label)?;
+                        lower_expr_to_ir(left, out, locals, next_local, next_label)?;
                         out.push(IrInstr::JumpIfFalse(else_lbl));
-                        lower_expr_to_ir(right, out, locals, next_label)?;
+                        lower_expr_to_ir(right, out, locals, next_local, next_label)?;
                         out.push(IrInstr::Jump(end_lbl));
                         out.push(IrInstr::Label(else_lbl));
                         out.push(IrInstr::PushConst(0));
@@ -157,13 +239,13 @@ pub fn compile_project(
                         *next_label += 1;
                         let end_lbl = *next_label;
                         *next_label += 1;
-                        lower_expr_to_ir(left, out, locals, next_label)?;
+                        lower_expr_to_ir(left, out, locals, next_local, next_label)?;
                         out.push(IrInstr::JumpIfFalse(eval_lbl));
 
                         out.push(IrInstr::PushConst(1));
                         out.push(IrInstr::Jump(end_lbl));
                         out.push(IrInstr::Label(eval_lbl));
-                        lower_expr_to_ir(right, out, locals, next_label)?;
+                        lower_expr_to_ir(right, out, locals, next_local, next_label)?;
                         out.push(IrInstr::Label(end_lbl));
                         Ok(())
                     }
@@ -184,14 +266,14 @@ pub fn compile_project(
             Expr::ArrayLiteral(elems) => {
                 out.push(IrInstr::Call("array_new".into(), 0));
                 for el in elems {
-                    lower_expr_to_ir(el, out, locals, next_label)?;
+                    lower_expr_to_ir(el, out, locals, next_local, next_label)?;
                     out.push(IrInstr::Call("push".into(), 2));
                 }
                 Ok(())
             }
             Expr::Index { expr: arr, index } => {
-                lower_expr_to_ir(arr, out, locals, next_label)?;
-                lower_expr_to_ir(index, out, locals, next_label)?;
+                lower_expr_to_ir(arr, out, locals, next_local, next_label)?;
+                lower_expr_to_ir(index, out, locals, next_local, next_label)?;
                 out.push(IrInstr::Call("array_get".into(), 2));
                 Ok(())
             }
@@ -211,7 +293,7 @@ pub fn compile_project(
         match stmt {
             Stmt::Let { name, value, .. } => {
                 let mut res = Vec::new();
-                lower_expr_to_ir(value, &mut res, locals, next_label)?;
+                lower_expr_to_ir(value, &mut res, locals, next_local, next_label)?;
                 let idx = if let Some(&i) = locals.get(name) {
                     i
                 } else {
@@ -245,14 +327,14 @@ pub fn compile_project(
                     .ok_or_else(|| format!("assign-index to unknown variable '{}'", name))?;
                 res.push(IrInstr::LoadLocal(*arr_idx));
 
-                lower_expr_to_ir(index, &mut res, locals, next_label)?;
-                lower_expr_to_ir(value, &mut res, locals, next_label)?;
+                lower_expr_to_ir(index, &mut res, locals, next_local, next_label)?;
+                lower_expr_to_ir(value, &mut res, locals, next_local, next_label)?;
                 res.push(IrInstr::Call("array_set".into(), 3));
                 Ok(res)
             }
             Stmt::Assign { name, value } => {
                 let mut res = Vec::new();
-                lower_expr_to_ir(value, &mut res, locals, next_label)?;
+                lower_expr_to_ir(value, &mut res, locals, next_local, next_label)?;
                 let idx = locals
                     .get(name)
                     .ok_or_else(|| format!("assign to unknown variable '{}'", name))?;
@@ -290,7 +372,7 @@ pub fn compile_project(
                             if let Some(v) = eval_const_integer(arg_expr) {
                                 res.push(IrInstr::EmitString(format!("{}", v)));
                             } else {
-                                lower_expr_to_ir(arg_expr, &mut res, locals, next_label)?;
+                                lower_expr_to_ir(arg_expr, &mut res, locals, next_local, next_label)?;
                                 res.push(IrInstr::EmitInt);
                             }
                         }
@@ -302,7 +384,7 @@ pub fn compile_project(
             }
             Stmt::Expr(expr) => {
                 let mut res = Vec::new();
-                lower_expr_to_ir(expr, &mut res, locals, next_label)?;
+                lower_expr_to_ir(expr, &mut res, locals, next_local, next_label)?;
 
                 res.push(IrInstr::Pop);
                 return Ok(res);
@@ -317,7 +399,7 @@ pub fn compile_project(
                 *next_label += 1;
                 let end_lbl = *next_label;
                 *next_label += 1;
-                lower_expr_to_ir(cond, &mut res, locals, next_label)?;
+                lower_expr_to_ir(cond, &mut res, locals, next_local, next_label)?;
                 res.push(IrInstr::JumpIfFalse(else_lbl));
                 for s in then_block {
                     let mut inner = lower_stmt_to_ir(
@@ -355,7 +437,7 @@ pub fn compile_project(
                 let end_lbl = *next_label;
                 *next_label += 1;
                 res.push(IrInstr::Label(start_lbl));
-                lower_expr_to_ir(cond, &mut res, locals, next_label)?;
+                lower_expr_to_ir(cond, &mut res, locals, next_local, next_label)?;
                 res.push(IrInstr::JumpIfFalse(end_lbl));
                 for s in body {
                     let mut inner = lower_stmt_to_ir(
@@ -401,7 +483,7 @@ pub fn compile_project(
                     i
                 };
 
-                lower_expr_to_ir(iterable, &mut res, locals, next_label)?;
+                lower_expr_to_ir(iterable, &mut res, locals, next_local, next_label)?;
                 res.push(IrInstr::StoreLocal(arr_local));
 
                 res.push(IrInstr::PushConst(0));
@@ -448,7 +530,7 @@ pub fn compile_project(
             }
             Stmt::Return(expr, _ty) => {
                 let mut res = Vec::new();
-                lower_expr_to_ir(expr, &mut res, locals, next_label)?;
+                lower_expr_to_ir(expr, &mut res, locals, next_local, next_label)?;
                 res.push(IrInstr::Ret);
                 Ok(res)
             }
