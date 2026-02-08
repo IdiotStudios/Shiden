@@ -41,12 +41,72 @@ impl<'a> Parser<'a> {
                         body: f.3,
                     });
                 }
+                Token::Let => {
+                    if let Token::StringLiteral(_) = self.peek {
+                        match self.parse_import() {
+                            Ok((path, alias)) => {
+                                items.push(Item::Import { path, alias });
+                            }
+                            Err(_) => {
+                                self.advance();
+                            }
+                        }
+                    } else {
+                        self.advance();
+                    }
+                }
                 _ => {
                     self.advance();
                 }
             }
         }
         Ok(Program { items })
+    }
+
+    fn parse_import(&mut self) -> Result<(String, String), String> {
+        self.advance();
+
+        let path = match &self.cur {
+            Token::StringLiteral(s) => s.clone(),
+            other => {
+                return Err(format!(
+                    "expected string literal for import path, got: {:?}",
+                    other
+                ));
+            }
+        };
+
+        self.advance();
+
+        if let Token::Equal = &self.cur {
+            self.advance();
+        } else {
+            return Err("expected '=' after import path".into());
+        }
+
+        let alias = match &self.cur {
+            Token::StringLiteral(s) => s.clone(),
+            Token::Identifier(s) => s.clone(),
+            other => {
+                return Err(format!(
+                    "expected string or identifier for import alias, got: {:?}",
+                    other
+                ));
+            }
+        };
+
+        self.advance();
+
+        if let Token::Type(t) = &self.cur {
+            if t == "import" {
+                self.advance();
+                Ok((path, alias))
+            } else {
+                Err("expected '/import' type suffix".into())
+            }
+        } else {
+            Err("expected '/import' type suffix".into())
+        }
     }
 
     fn parse_function(
@@ -241,7 +301,7 @@ impl<'a> Parser<'a> {
                 }
 
                 let mut body = Vec::new();
-                while !(matches!(&self.cur, Token::Fn) && matches!(&self.peek, Token::Slash)) {
+                while !(matches!(&self.cur, Token::For) && matches!(&self.peek, Token::Slash)) {
                     if let Token::Eof = &self.cur {
                         return Err("unexpected EOF while parsing for body".into());
                     }
@@ -252,8 +312,12 @@ impl<'a> Parser<'a> {
                     }
                 }
 
-                self.advance();
-                self.advance();
+                if matches!(&self.cur, Token::For) && matches!(&self.peek, Token::Slash) {
+                    self.advance();
+                    self.advance();
+                } else {
+                    return Err("expected 'for/' to close for".into());
+                }
                 Ok(Some(Stmt::For {
                     var,
                     iterable,
@@ -275,7 +339,7 @@ impl<'a> Parser<'a> {
 
                 let mut then_block = Vec::new();
                 while !(matches!(&self.cur, Token::Else)
-                    || (matches!(&self.cur, Token::Fn) && matches!(&self.peek, Token::Slash)))
+                    || (matches!(&self.cur, Token::If) && matches!(&self.peek, Token::Slash)))
                 {
                     if let Token::Eof = &self.cur {
                         return Err("unexpected EOF in if then-block".into());
@@ -295,7 +359,7 @@ impl<'a> Parser<'a> {
                         return Err("expected '/' after else".into());
                     }
                     let mut eblock = Vec::new();
-                    while !(matches!(&self.cur, Token::Fn) && matches!(&self.peek, Token::Slash)) {
+                    while !(matches!(&self.cur, Token::If) && matches!(&self.peek, Token::Slash)) {
                         if let Token::Eof = &self.cur {
                             return Err("unexpected EOF in else block".into());
                         }
@@ -308,11 +372,11 @@ impl<'a> Parser<'a> {
                     else_block = Some(eblock);
                 }
 
-                if matches!(&self.cur, Token::Fn) && matches!(&self.peek, Token::Slash) {
+                if matches!(&self.cur, Token::If) && matches!(&self.peek, Token::Slash) {
                     self.advance();
                     self.advance();
                 } else {
-                    return Err("expected 'fn/' to close if".into());
+                    return Err("expected 'if/' to close if".into());
                 }
                 Ok(Some(Stmt::If {
                     cond,
@@ -334,7 +398,7 @@ impl<'a> Parser<'a> {
                 }
 
                 let mut body = Vec::new();
-                while !(matches!(&self.cur, Token::Fn) && matches!(&self.peek, Token::Slash)) {
+                while !(matches!(&self.cur, Token::While) && matches!(&self.peek, Token::Slash)) {
                     if let Token::Eof = &self.cur {
                         return Err("unexpected EOF in while body".into());
                     }
@@ -345,11 +409,11 @@ impl<'a> Parser<'a> {
                     }
                 }
 
-                if matches!(&self.cur, Token::Fn) && matches!(&self.peek, Token::Slash) {
+                if matches!(&self.cur, Token::While) && matches!(&self.peek, Token::Slash) {
                     self.advance();
                     self.advance();
                 } else {
-                    return Err("expected 'fn/' to close while".into());
+                    return Err("expected 'while/' to close while".into());
                 }
                 Ok(Some(Stmt::While { cond, body }))
             }

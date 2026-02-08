@@ -1,0 +1,91 @@
+fn new run(code)/
+    let mut cmds = []/array
+    for c in code/
+        push(cmds, c)/unit
+    for/
+
+    let mut tape = []/array
+    push(tape, 0)/unit
+    let mut ptr = 0/i64
+    let mut ip = 0/i64
+
+    let mut n = len(cmds)/i64
+    while ip < n/
+        let cmd = cmds[ip]/char
+
+        if cmd == '>'/
+            ptr = ptr + 1/i64
+            while ptr >= len(tape)/i64/
+                push(tape, 0)/unit
+            while/
+        if/
+
+        if cmd == '<'/
+            if ptr == 0/i64/
+                ip = n/i64
+            if/
+            ptr = ptr - 1/i64
+        if/
+
+        if cmd == '+'/
+            let v = tape[ptr]/i64
+            tape[ptr] = v + 1/i64
+        if/
+
+        if cmd == '-'/
+            let v = tape[ptr]/i64
+            tape[ptr] = v - 1/i64
+        if/
+
+        if cmd == '.'/
+            println("{}", tape[ptr])/unit
+        if/
+
+        if cmd == ','/
+        if/
+
+        if cmd == '['/
+            if tape[ptr] == 0/i64/
+                let mut depth = 1/i64
+                let mut j = ip + 1/i64
+                while j < n/
+                    let c2 = cmds[j]/char
+                    if c2 == '['/
+                        depth = depth + 1/i64
+                    if/
+                    if c2 == ']'/
+                        depth = depth - 1/i64
+                        if depth == 0/i64/
+                            ip = j/i64
+                            break/
+                        if/
+                    if/
+                    j = j + 1/i64
+                while/
+            if/
+        if/
+
+        if cmd == ']'/
+            if !(tape[ptr] == 0)/
+                let mut depth = 1/i64
+                let mut j = ip - 1/i64
+                while j >= 0/i64/
+                    let c2 = cmds[j]/char
+                    if c2 == ']'/
+                        depth = depth + 1/i64
+                    if/
+                    if c2 == '['/
+                        depth = depth - 1/i64
+                        if depth == 0/i64/
+                            ip = j/i64
+                            break/
+                        if/
+                    if/
+                    j = j - 1/i64
+                while/
+            if/
+        if/
+
+        ip = ip + 1/i64
+    while/
+fn/

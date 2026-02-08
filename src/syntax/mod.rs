@@ -168,7 +168,7 @@ impl<'a> Lexer<'a> {
 
             let types = [
                 "u8", "u16", "u32", "u64", "usize", "i8", "i16", "i32", "i64", "f32", "f64", "str",
-                "char", "bool", "array", "unit",
+                "char", "bool", "array", "unit", "import",
             ];
             for ty in types.iter() {
                 if rest.starts_with(ty) {
@@ -296,9 +296,13 @@ pub enum Item {
         ret: Option<String>,
         body: Vec<Stmt>,
     },
+    Import {
+        path: String,
+        alias: String,
+    },
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Stmt {
     Let {
         name: String,
@@ -351,13 +355,13 @@ pub enum BinOp {
     Or,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum UnaryOp {
     Neg,
     Not,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
     Identifier(String),
     StringLiteral(String),

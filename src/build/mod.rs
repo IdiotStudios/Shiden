@@ -1,10 +1,61 @@
 use object::SymbolScope;
 use object::write::{Object, StandardSection, Symbol, SymbolSection};
 use object::{Architecture, BinaryFormat, Endianness};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use crate::frontend;
+
+fn resolve_imports(proj_dir: &Path, prog: &mut crate::syntax::Program) -> Result<(), String> {
+    let mut imports = Vec::new();
+    let mut remaining_items = Vec::new();
+
+    for item in prog.items.drain(..) {
+        if let crate::syntax::Item::Import { path, alias } = item {
+            imports.push((path, alias));
+        } else {
+            remaining_items.push(item);
+        }
+    }
+
+    let mut loaded_modules = HashMap::new();
+    for (path, _alias) in &imports {
+        if !loaded_modules.contains_key(path) {
+            let module_path = proj_dir.join("src").join(format!("{}.sd", path));
+            let module_src = std::fs::read_to_string(&module_path)
+                .map_err(|e| format!("Failed to read module {}: {}", path, e))?;
+            let module_prog = crate::frontend::parse(&module_src)
+                .map_err(|e| format!("Parse error in module {}: {}", path, e))?;
+            loaded_modules.insert(path.clone(), module_prog);
+        }
+    }
+
+    for (path, alias) in imports {
+        if let Some(module_prog) = loaded_modules.get(&path) {
+            for item in &module_prog.items {
+                if let crate::syntax::Item::Function {
+                    name,
+                    params,
+                    ret,
+                    body,
+                } = item
+                {
+                    let qualified_name = format!("{}_{}", alias, name);
+                    remaining_items.push(crate::syntax::Item::Function {
+                        name: qualified_name,
+                        params: params.clone(),
+                        ret: ret.clone(),
+                        body: body.clone(),
+                    });
+                }
+            }
+        }
+    }
+
+    prog.items = remaining_items;
+    Ok(())
+}
 
 pub fn compile_project(
     proj_dir: &Path,
@@ -19,7 +70,9 @@ pub fn compile_project(
     let main_path = proj_dir.join("src").join("main.sd");
     let src = std::fs::read_to_string(&main_path)
         .map_err(|e| format!("Failed to read {}: {}", main_path.display(), e))?;
-    let prog = crate::frontend::parse(&src).map_err(|e| format!("Parse error: {}", e))?;
+    let mut prog = crate::frontend::parse(&src).map_err(|e| format!("Parse error: {}", e))?;
+
+    resolve_imports(proj_dir, &mut prog)?;
 
     let main = prog
         .items
@@ -372,7 +425,9 @@ pub fn compile_project(
                             if let Some(v) = eval_const_integer(arg_expr) {
                                 res.push(IrInstr::EmitString(format!("{}", v)));
                             } else {
-                                lower_expr_to_ir(arg_expr, &mut res, locals, next_local, next_label)?;
+                                lower_expr_to_ir(
+                                    arg_expr, &mut res, locals, next_local, next_label,
+                                )?;
                                 res.push(IrInstr::EmitInt);
                             }
                         }
@@ -1380,7 +1435,7 @@ pub fn compile_project(
             .map_err(|e| format!("failed to write exe: {}", e))?;
         f.sync_all()
             .map_err(|e| format!("failed to sync exe: {}", e))?;
-        
+
         drop(f);
     }
 
@@ -1405,17 +1460,14 @@ mod tests {
     use std::process::Command;
     use tempfile::tempdir;
 
-    
-    
     fn run_exe(exe: &std::path::Path) -> std::io::Result<std::process::Output> {
         let mut attempts = 0;
         const MAX_ATTEMPTS: u32 = 5;
-        
+
         loop {
             match Command::new(exe).output() {
                 Ok(output) => return Ok(output),
                 Err(e) if e.raw_os_error() == Some(26) && attempts < MAX_ATTEMPTS => {
-                    
                     attempts += 1;
                     std::thread::sleep(std::time::Duration::from_millis(50));
                 }
