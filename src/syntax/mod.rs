@@ -43,11 +43,18 @@ pub enum Token {
 pub struct Lexer<'a> {
     src: &'a str,
     pos: usize,
+    line: usize,
+    col: usize,
 }
 
 impl<'a> Lexer<'a> {
     pub fn new(src: &'a str) -> Self {
-        Self { src, pos: 0 }
+        Self {
+            src,
+            pos: 0,
+            line: 1,
+            col: 1,
+        }
     }
 
     fn peek_char(&self) -> Option<char> {
@@ -58,11 +65,17 @@ impl<'a> Lexer<'a> {
         for _ in 0..n {
             if let Some(ch) = self.peek_char() {
                 self.pos += ch.len_utf8();
+                if ch == '\n' {
+                    self.line += 1;
+                    self.col = 1;
+                } else {
+                    self.col += 1;
+                }
             }
         }
     }
 
-    pub fn next_token(&mut self) -> Token {
+    pub fn next_token_with_pos(&mut self) -> (Token, usize, usize) {
         while let Some(ch) = self.peek_char() {
             if ch.is_whitespace() {
                 self.bump(1);
@@ -71,27 +84,30 @@ impl<'a> Lexer<'a> {
             break;
         }
 
+        let start_line = self.line;
+        let start_col = self.col;
+
         if self.pos >= self.src.len() {
-            return Token::Eof;
+            return (Token::Eof, start_line, start_col);
         }
 
         let ch = self.peek_char().unwrap();
 
         if ch == '(' {
             self.bump(1);
-            return Token::LParen;
+            return (Token::LParen, start_line, start_col);
         }
         if ch == ')' {
             self.bump(1);
-            return Token::RParen;
+            return (Token::RParen, start_line, start_col);
         }
         if ch == '[' {
             self.bump(1);
-            return Token::LBracket;
+            return (Token::LBracket, start_line, start_col);
         }
         if ch == ']' {
             self.bump(1);
-            return Token::RBracket;
+            return (Token::RBracket, start_line, start_col);
         }
         if ch == '=' {
             let rest = &self.src[self.pos..];
@@ -99,57 +115,57 @@ impl<'a> Lexer<'a> {
             it.next();
             if let Some('=') = it.next() {
                 self.bump(2);
-                return Token::EqEq;
+                return (Token::EqEq, start_line, start_col);
             }
             self.bump(1);
-            return Token::Equal;
+            return (Token::Equal, start_line, start_col);
         }
         if ch == ',' {
             self.bump(1);
-            return Token::Comma;
+            return (Token::Comma, start_line, start_col);
         }
         if ch == '<' {
             let rest = &self.src[self.pos..];
             if rest.starts_with("<=") {
                 self.bump(2);
-                return Token::LessEqual;
+                return (Token::LessEqual, start_line, start_col);
             }
             self.bump(1);
-            return Token::Less;
+            return (Token::Less, start_line, start_col);
         }
         if ch == '>' {
             let rest = &self.src[self.pos..];
             if rest.starts_with(">=") {
                 self.bump(2);
-                return Token::GreaterEqual;
+                return (Token::GreaterEqual, start_line, start_col);
             }
             self.bump(1);
-            return Token::Greater;
+            return (Token::Greater, start_line, start_col);
         }
         if ch == '+' {
             self.bump(1);
-            return Token::Plus;
+            return (Token::Plus, start_line, start_col);
         }
         if ch == '-' {
             self.bump(1);
-            return Token::Minus;
+            return (Token::Minus, start_line, start_col);
         }
         if ch == '*' {
             self.bump(1);
-            return Token::Star;
+            return (Token::Star, start_line, start_col);
         }
         if ch == '&' {
             let rest = &self.src[self.pos..];
             if rest.starts_with("&&") {
                 self.bump(2);
-                return Token::AndAnd;
+                return (Token::AndAnd, start_line, start_col);
             }
         }
         if ch == '|' {
             let rest = &self.src[self.pos..];
             if rest.starts_with("||") {
                 self.bump(2);
-                return Token::OrOr;
+                return (Token::OrOr, start_line, start_col);
             }
         }
         if ch == '!' {
@@ -158,10 +174,10 @@ impl<'a> Lexer<'a> {
             it.next();
             if let Some('=') = it.next() {
                 self.bump(2);
-                return Token::NotEq;
+                return (Token::NotEq, start_line, start_col);
             }
             self.bump(1);
-            return Token::Bang;
+            return (Token::Bang, start_line, start_col);
         }
         if ch == '/' {
             let rest = &self.src[self.pos + 1..];
@@ -183,7 +199,7 @@ impl<'a> Lexer<'a> {
                         || next_char == Some('/')
                     {
                         self.bump(1 + ty.len());
-                        return Token::Type(ty.to_string());
+                        return (Token::Type(ty.to_string()), start_line, start_col);
                     }
                 }
             }
@@ -201,8 +217,8 @@ impl<'a> Lexer<'a> {
             }
             self.bump(1);
             return match next_non_ws {
-                Some('\n') | None => Token::Slash,
-                _ => Token::SlashOp,
+                Some('\n') | None => (Token::Slash, start_line, start_col),
+                _ => (Token::SlashOp, start_line, start_col),
             };
         }
 
@@ -217,7 +233,7 @@ impl<'a> Lexer<'a> {
                 s.push(c);
                 self.bump(1);
             }
-            return Token::StringLiteral(s);
+            return (Token::StringLiteral(s), start_line, start_col);
         }
 
         if (ch as u32) == 39 {
@@ -229,7 +245,7 @@ impl<'a> Lexer<'a> {
                 if let Some('\'') = self.peek_char() {
                     self.bump(1);
                 }
-                return Token::CharLiteral(chval);
+                return (Token::CharLiteral(chval), start_line, start_col);
             }
         }
 
@@ -243,21 +259,25 @@ impl<'a> Lexer<'a> {
                 }
                 break;
             }
-            return match ident.as_str() {
-                "fn" => Token::Fn,
-                "new" => Token::New,
-                "let" => Token::Let,
-                "mut" => Token::Mut,
-                "return" => Token::Return,
-                "if" => Token::If,
-                "while" => Token::While,
-                "else" => Token::Else,
-                "break" => Token::Break,
-                "continue" => Token::Continue,
-                "for" => Token::For,
-                "in" => Token::In,
-                _ => Token::Identifier(ident),
-            };
+            return (
+                match ident.as_str() {
+                    "fn" => Token::Fn,
+                    "new" => Token::New,
+                    "let" => Token::Let,
+                    "mut" => Token::Mut,
+                    "return" => Token::Return,
+                    "if" => Token::If,
+                    "while" => Token::While,
+                    "else" => Token::Else,
+                    "break" => Token::Break,
+                    "continue" => Token::Continue,
+                    "for" => Token::For,
+                    "in" => Token::In,
+                    _ => Token::Identifier(ident),
+                },
+                start_line,
+                start_col,
+            );
         }
 
         if ch.is_ascii_digit() {
@@ -275,11 +295,15 @@ impl<'a> Lexer<'a> {
                 }
                 break;
             }
-            return Token::Number(num);
+            return (Token::Number(num), start_line, start_col);
         }
 
         self.bump(1);
-        self.next_token()
+        self.next_token_with_pos()
+    }
+
+    pub fn next_token(&mut self) -> Token {
+        self.next_token_with_pos().0
     }
 }
 

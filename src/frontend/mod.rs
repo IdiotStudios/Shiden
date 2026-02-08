@@ -4,22 +4,30 @@ struct Parser<'a> {
     lexer: Lexer<'a>,
     cur: Token,
     peek: Token,
+    cur_pos: (usize, usize),
+    peek_pos: (usize, usize),
 }
 
 impl<'a> Parser<'a> {
     fn new(src: &'a str) -> Self {
         let mut lx = Lexer::new(src);
-        let cur = lx.next_token();
-        let peek = lx.next_token();
+        let (cur, cur_line, cur_col) = lx.next_token_with_pos();
+        let (peek, peek_line, peek_col) = lx.next_token_with_pos();
         Parser {
             lexer: lx,
             cur,
             peek,
+            cur_pos: (cur_line, cur_col),
+            peek_pos: (peek_line, peek_col),
         }
     }
 
     fn advance(&mut self) {
-        self.cur = std::mem::replace(&mut self.peek, self.lexer.next_token());
+        self.cur = std::mem::replace(&mut self.peek, Token::Eof);
+        self.cur_pos = self.peek_pos;
+        let (next, line, col) = self.lexer.next_token_with_pos();
+        self.peek = next;
+        self.peek_pos = (line, col);
     }
 
     fn parse_program(&mut self) -> Result<Program, String> {
@@ -801,7 +809,13 @@ impl<'a> Parser<'a> {
 
 pub fn parse(src: &str) -> Result<Program, String> {
     let mut p = Parser::new(src);
-    p.parse_program()
+    match p.parse_program() {
+        Ok(prog) => Ok(prog),
+        Err(e) => Err(format!(
+            "{} (line {}, col {})",
+            e, p.cur_pos.0, p.cur_pos.1
+        )),
+    }
 }
 
 #[cfg(test)]

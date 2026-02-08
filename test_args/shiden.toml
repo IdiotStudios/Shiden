@@ -1,0 +1,10 @@
+[project]
+name = "test-args"
+version = "0.1.0"
+type = "binary"
+
+[build]
+opt_level = 0
+targets = ["x86_64-linux"]
+
+[dependencies]

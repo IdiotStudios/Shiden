@@ -5,6 +5,32 @@ use std::io::{self, Read};
 use std::thread;
 use std::time::Duration;
 
+fn split_error_loc(err: &str) -> (String, Option<(usize, usize)>) {
+    if let Some(idx) = err.rfind(" (line ") {
+        let msg = err[..idx].to_string();
+        let tail = &err[idx + 2..];
+        let tail = tail.trim_end_matches(')');
+        let mut parts = tail.split(',');
+        let line_part = parts.next().unwrap_or("");
+        let col_part = parts.next().unwrap_or("");
+        let line = line_part.trim_start_matches("line ").trim();
+        let col = col_part.trim_start_matches("col ").trim();
+        if let (Ok(l), Ok(c)) = (line.parse::<usize>(), col.parse::<usize>()) {
+            return (msg, Some((l, c)));
+        }
+    }
+    (err.to_string(), None)
+}
+
+fn format_parse_error(file_label: &str, err: &str) -> String {
+    let (msg, loc) = split_error_loc(err);
+    if let Some((line, col)) = loc {
+        format!("{}:{}:{}: {}", file_label, line, col, msg)
+    } else {
+        format!("{}: {}", file_label, err)
+    }
+}
+
 #[derive(Parser)]
 #[command(author, version, about)]
 pub struct Cli {
@@ -55,7 +81,8 @@ pub fn run() {
             Ok(src) => match crate::frontend::parse(&src) {
                 Ok(prog) => println!("Parsed program: {:?}", prog),
                 Err(e) => {
-                    eprintln!("Parse error: {}", e);
+                    let label = file.clone().unwrap_or_else(|| "<stdin>".into());
+                    eprintln!("Parse error: {}", format_parse_error(&label, &e));
                     std::process::exit(2);
                 }
             },
@@ -189,13 +216,18 @@ pub fn run() {
                     Err(e) => {
                         if want_json {
                             let file_path = file.clone().unwrap_or_else(|| "".into());
+                            let (msg, loc) = split_error_loc(&e);
+                            let (line, col) = loc.unwrap_or((1, 1));
                             println!(
-                                "{{\"diagnostics\":[{{\"file\":\"{}\",\"line\":1,\"col\":1,\"severity\":\"error\",\"message\":\"{}\"}}]}}",
+                                "{{\"diagnostics\":[{{\"file\":\"{}\",\"line\":{},\"col\":{},\"severity\":\"error\",\"message\":\"{}\"}}]}}",
                                 file_path,
-                                escape_json(&e)
+                                line,
+                                col,
+                                escape_json(&msg)
                             );
                         } else {
-                            eprintln!("Parse error: {}", e);
+                            let label = file.clone().unwrap_or_else(|| "<stdin>".into());
+                            eprintln!("Parse error: {}", format_parse_error(&label, &e));
                         }
                         std::process::exit(2);
                     }
