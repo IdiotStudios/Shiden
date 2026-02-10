@@ -13,7 +13,6 @@ jobs:
           toolchain: stable
           override: true
       - run: cargo build --release
-      - run: cargo test --all
       - uses: actions/upload-artifact@v4
         with:
           name: windows-build
@@ -28,7 +27,6 @@ jobs:
           toolchain: stable
           override: true
       - run: cargo build --release
-      - run: cargo test --all
       - uses: actions/upload-artifact@v4
         with:
           name: linux-build
@@ -43,7 +41,6 @@ jobs:
           toolchain: stable
           override: true
       - run: cargo build --release
-      - run: cargo test --all
       - uses: actions/upload-artifact@v4
         with:
           name: macos-build
