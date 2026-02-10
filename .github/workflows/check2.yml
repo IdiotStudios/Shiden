@@ -50,4 +50,4 @@ jobs:
         run: cargo run -- run examples/brainfuck
       
       - name: Run Shiden HTTP server
-        run: cargo run -- http examples/http\ server
+        run: cargo run -- run examples/http\ server
