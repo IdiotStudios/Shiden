@@ -1,11 +1,21 @@
 # Shiden
 
-Shiden is a high-performance, ahead-of-time compiled programming language built for speed, predictability, and low-level control while retaining a familiar, Rust like syntax. (❤️ [Rust)](https://github.com/rust-lang/rust)
+Shiden is a high-performance, ahead-of-time compiled programming language built for speed, predictability, and low-level control while retaining a familiar, Rust like syntax. (❤️ [Rust](https://github.com/rust-lang/rust))
 
 Shiden has a .sd file format
 
 VSCode-Extension: [here](https://marketplace.visualstudio.com/items?itemName=IdiotStudios.shiden)  
 Flavortown-Project: [here](https://flavortown.hackclub.com/projects/10866)
+Browser-Extension: (hint...)
+
+## Libraries
+
+Shiden has built in (libraries)[tree/main/src/libraries].  
+Which are:
+
+* (Networking)[tree/main/src/libraries/networking]
+* (Filesystem)[tree/main/src/libraries/filesystem]
+
 
 ## CLI
 
