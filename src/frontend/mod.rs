@@ -134,10 +134,40 @@ impl<'a> Parser<'a> {
             other => return Err(format!("expected 'new' after fn, got: {:?}", other)),
         }
         self.advance();
-        let name = match &self.cur {
-            Token::Identifier(s) => s.clone(),
-            other => return Err(format!("expected identifier for fn name, got: {:?}", other)),
-        };
+
+        let mut name_parts: Vec<String> = Vec::new();
+
+        loop {
+            match &self.cur {
+                Token::Identifier(s) => {
+                    name_parts.push(s.clone());
+                }
+                Token::New => {
+                    name_parts.push("new".to_string());
+                }
+                _ => {
+                    if name_parts.is_empty() {
+                        return Err(format!(
+                            "expected identifier for fn name, got: {:?}",
+                            self.cur
+                        ));
+                    }
+                    break;
+                }
+            }
+
+            match &self.peek {
+                Token::Identifier(_) | Token::New => {
+                    self.advance();
+                }
+                Token::LParen => {
+                    break;
+                }
+                _ => break,
+            }
+        }
+
+        let name = name_parts.join("_");
 
         let mut params: Vec<(String, Option<String>)> = Vec::new();
         self.advance();
@@ -192,7 +222,6 @@ impl<'a> Parser<'a> {
                 return Err("unexpected EOF while parsing function body".into());
             }
 
-            println!("PARSE_FUNCTION: cur={:?} peek={:?}", self.cur, self.peek);
             if let Some(stmt) = self.parse_stmt()? {
                 body.push(stmt);
             } else {
@@ -207,7 +236,6 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_stmt(&mut self) -> Result<Option<Stmt>, String> {
-        println!("PARSE_STMT ENTRY cur={:?} peek={:?}", self.cur, self.peek);
         match &self.cur {
             Token::Let => {
                 self.advance();
@@ -710,6 +738,69 @@ impl<'a> Parser<'a> {
                     }
                 }
 
+                if name == "net" {
+                    if let Token::Identifier(_) = &self.peek {
+                        self.advance();
+
+                        let mut parts: Vec<String> = Vec::new();
+
+                        loop {
+                            match &self.cur {
+                                Token::Identifier(s) => {
+                                    parts.push(s.clone());
+                                }
+                                Token::New => {
+                                    parts.push("new".to_string());
+                                }
+                                _ => break,
+                            }
+
+                            if let Token::LParen = &self.peek {
+                                break;
+                            }
+                            if let Token::Identifier(_) | Token::New = &self.peek {
+                                self.advance();
+                            } else {
+                                break;
+                            }
+                        }
+                        if let Token::LParen = &self.peek {
+                            self.advance();
+                            self.advance();
+                            let mut args = Vec::new();
+                            while let Token::StringLiteral(_)
+                            | Token::Identifier(_)
+                            | Token::Number(_)
+                            | Token::LParen
+                            | Token::Bang
+                            | Token::Minus
+                            | Token::CharLiteral(_) = &self.cur
+                            {
+                                args.push(self.parse_expr()?);
+                                if let Token::Comma = &self.cur {
+                                    self.advance();
+                                    continue;
+                                }
+                                if let Token::RParen = &self.cur {
+                                    break;
+                                }
+                            }
+                            if let Token::RParen = &self.cur {
+                                self.advance();
+                            } else {
+                                return Err("expected ')'".into());
+                            }
+                            let combined = format!("net_{}", parts.join("_"));
+                            return Ok(Expr::Call {
+                                name: combined,
+                                args,
+                            });
+                        }
+
+                        return Ok(Expr::Identifier(name));
+                    }
+                }
+
                 self.advance();
                 if let Token::LParen = &self.cur {
                     self.advance();
@@ -811,10 +902,7 @@ pub fn parse(src: &str) -> Result<Program, String> {
     let mut p = Parser::new(src);
     match p.parse_program() {
         Ok(prog) => Ok(prog),
-        Err(e) => Err(format!(
-            "{} (line {}, col {})",
-            e, p.cur_pos.0, p.cur_pos.1
-        )),
+        Err(e) => Err(format!("{} (line {}, col {})", e, p.cur_pos.0, p.cur_pos.1)),
     }
 }
 

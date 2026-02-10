@@ -120,15 +120,13 @@ pub fn run() {
                                 mf.build.as_ref().and_then(|b| b.opt_level),
                             ) {
                                 Ok(exe) => {
-                                    let out = std::process::Command::new(&exe)
-                                        .output()
+                                    let mut child = std::process::Command::new(&exe)
+                                        .spawn()
                                         .unwrap_or_else(|e| {
                                             eprintln!("failed to run: {}", e);
                                             std::process::exit(1)
                                         });
-                                    use std::io::Write;
-                                    std::io::stdout().write(&out.stdout).ok();
-                                    std::io::stderr().write(&out.stderr).ok();
+                                    let _ = child.wait();
                                 }
                                 Err(e) => {
                                     eprintln!("Build failed: {}", e);

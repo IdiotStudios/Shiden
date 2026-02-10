@@ -1,8 +1,7 @@
 /target
 /docs
 /vscode-extension/node_modules
-CHANGELOG.md
 /scripts
-/test/build
 REWRITE_PROGRESS.md
+# Work in Progress (half of it doesent even work)
 /rewrite

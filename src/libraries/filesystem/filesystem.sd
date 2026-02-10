@@ -1,42 +1,50 @@
-# Filesystem convenience wrappers for builtins
-
-# Read a file and return its contents as string
-fn new fs_read(path)/str
-    read_file(path)/str
+# Basic File Operations
+fn new fs read(path/str)/str
+    __fs_read(path)/str
 fn/
 
-# Write a string to a file (overwrites)
-fn new fs_write(path, content)/unit
-    write_file(path, content)/unit
+fn new fs write(path/str, content/str)/unit
+    __fs_write(path, content)/unit
 fn/
 
-# Edit a JSON file by setting a top-level key to the provided value.
-# Usage (namespace style):
-#     fs write("example.json", "{\"example\": true}")/unit
-#     fs edit("example.json", "example", false)/unit
-#
-# The parser also supports hyphenated subcommands like `fs array-append(...)`.
-# Uses builtin `fs_edit`, `fs_delete`, `fs_array_append`, and `fs_merge` under the hood.
-fn new fs_edit(path, key, value)/unit
-    fs_edit(path, key, value)/unit
+fn new fs exists(path/str)/i64
+    __fs_exists(path)/i64
 fn/
 
-# Edit with strategy: "replace" (default), "merge", "append", "unique"
-fn new fs_edit_strategy(path, key, value, strat)/unit
-    fs_edit(path, key, value, strat)/unit
+fn new fs delete_file(path/str)/unit
+    __fs_delete_file(path)/unit
 fn/
 
-# Delete a top-level key from JSON file
-fn new fs_delete(path, key)/unit
-    fs_delete(path, key)/unit
+fn new fs file_size(path/str)/i64
+    __fs_file_size(path)/i64
 fn/
 
-# Append value to array at key
-fn new fs_array_append(path, key, value)/unit
-    fs_array_append(path, key, value)/unit
+# Directory Operations
+fn new fs mkdir(path/str)/unit
+    __fs_mkdir(path)/unit
 fn/
 
-# Merge a JSON string into the file (deep merge)
-fn new fs_merge(path, json_str)/unit
-    fs_merge(path, json_str)/unit
+fn new fs list_dir(path/str)/str
+    __fs_list_dir(path)/str
+fn/
+
+# JSON File Operations
+fn new fs edit(path/str, key/str, value/str)/unit
+    __fs_edit(path, key, value)/unit
+fn/
+
+fn new fs edit_strategy(path/str, key/str, value/str, strat/str)/unit
+    __fs_edit_strategy(path, key, value, strat)/unit
+fn/
+
+fn new fs delete(path/str, key/str)/unit
+    __fs_delete(path, key)/unit
+fn/
+
+fn new fs array_append(path/str, key/str, value/str)/unit
+    __fs_array_append(path, key, value)/unit
+fn/
+
+fn new fs merge(path/str, json_str/str)/unit
+    __fs_merge(path, json_str)/unit
 fn/

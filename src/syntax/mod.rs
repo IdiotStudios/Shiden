@@ -230,6 +230,44 @@ impl<'a> Lexer<'a> {
                     self.bump(1);
                     break;
                 }
+                if c == '\\' {
+                    self.bump(1);
+                    match self.peek_char() {
+                        Some('n') => {
+                            s.push('\n');
+                            self.bump(1);
+                        }
+                        Some('r') => {
+                            s.push('\r');
+                            self.bump(1);
+                        }
+                        Some('t') => {
+                            s.push('\t');
+                            self.bump(1);
+                        }
+                        Some('0') => {
+                            s.push('\0');
+                            self.bump(1);
+                        }
+                        Some('"') => {
+                            s.push('"');
+                            self.bump(1);
+                        }
+                        Some('\\') => {
+                            s.push('\\');
+                            self.bump(1);
+                        }
+                        Some(other) => {
+                            s.push('\\');
+                            s.push(other);
+                            self.bump(1);
+                        }
+                        None => {
+                            s.push('\\');
+                        }
+                    }
+                    continue;
+                }
                 s.push(c);
                 self.bump(1);
             }
