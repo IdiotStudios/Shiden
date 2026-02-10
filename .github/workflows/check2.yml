@@ -51,4 +51,4 @@ jobs:
       
       - name: Run Shiden HTTP server (with timeout)
         timeout-minutes: 1
-        run: timeout 5s cargo run -- run examples/http\ server
+        run: timeout 5s cargo run -- run examples/http\ server || [ $? -eq 124 ]
