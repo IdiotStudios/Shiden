@@ -1,4 +1,4 @@
-name: Check Rust
+name: Check Shiden and examples
 
 on:
   push:
@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - 'src/**'
+      - 'examples/**'
+      - 'rewrite/**'
       - 'Cargo.toml'
   workflow_dispatch:
 
@@ -14,10 +16,10 @@ permissions:
   pages: write
 
 jobs:
-  rust:
+  shiden:
     runs-on: ubuntu-latest
     environment:
-      name: check-rust
+      name: check-shiden
     permissions:
       pages: write
       id-token: write
@@ -28,7 +30,6 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-          components: clippy, rustfmt
 
       - name: Cache Cargo directories
         uses: actions/cache@v4
@@ -42,8 +43,11 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
-      - name: Run cargo check
-        run: cargo check --verbose
+      - name: Run cargo build
+        run: cargo build --release
 
-      - name: Run cargo test
-        run: cargo test --verbose
+      - name: Run Shiden Brainfuck interpreter
+        run: cargo run -- run examples/brainfuck
+      
+      - name: Run Shiden HTTP server
+        run: cargo run -- http examples/http\ server

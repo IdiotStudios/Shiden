@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shiden HTTP Server</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Shiden HTTP Server</h1>
+            <p class="subtitle">Built with raw x86_64 syscalls</p>
+        </header>
+        
+        <main>
+            <section class="card">
+                <h2>Welcome to Shiden</h2>
+                <p>This page is served by a web server written in <strong>Shiden</strong>, a custom programming language that compiles directly to x86_64 machine code.</p>
+            </section>
+            
+            <section class="card">
+                <h3>Technical Features</h3>
+                <ul>
+                    <li><strong>Raw TCP sockets</strong> - socket(41), bind(49), listen(50), accept(43)</li>
+                    <li><strong>HTTP/1.1 protocol</strong> - Full request parsing and response generation</li>
+                    <li><strong>Static file serving</strong> - HTML, CSS, and JavaScript</li>
+                    <li><strong>Zero dependencies</strong> - Compiles to standalone ELF binary</li>
+                    <li><strong>Direct syscalls</strong> - write(1), read(0), close(3)</li>
+                </ul>
+            </section>
+            
+            <section class="card interactive">
+                <h3>Interactive Demo</h3>
+                <p>Click the button to see JavaScript working with the Shiden server:</p>
+                <button id="demoButton" class="demo-button">Click Me!</button>
+                <p id="clickResult" class="result"></p>
+                <div id="statsBox" class="stats-box hidden">
+                    <h4>Request Stats</h4>
+                    <p>Clicks: <span id="clickCount">0</span></p>
+                    <p>Server uptime: Working!</p>
+                </div>
+            </section>
+            
+            <section class="card">
+                <h3>How It Works</h3>
+                <div class="code-block">
+                    <pre>fn new main/
+    let server = net server new(8000)/i64
+    
+    while true/
+        let client = net server accept(server)/i64
+        let path = parse request(net recv(client)/i64)/str
+        let content = fs read(path)/str
+        
+        net send(client, build response(content))/i64
+        net close(client)/i64
+    while/
+fn/</pre>
+                </div>
+            </section>
+        </main>
+        
+        <footer>
+            <p>Built with ❤️ using Shiden</p>
+            <p class="tech-details">
+                Network: socket→bind→listen→accept→write→close | 
+                Filesystem: open→read→close
+            </p>
+        </footer>
+    </div>
+    
+    <script src="/script.js"></script>
+</body>
+</html>
