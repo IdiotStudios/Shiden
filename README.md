@@ -10,11 +10,11 @@ Browser-Extension: (hint...)
 
 ## Libraries
 
-Shiden has built in [libraries](tree/main/src/libraries).  
+Shiden has built in [libraries](src/libraries).  
 Which are:
 
-* [Networking](tree/main/src/libraries/networking)
-* [Filesystem](tree/main/src/libraries/filesystem)
+* [Networking](src/libraries/networking)
+* [Filesystem](src/libraries/filesystem)
 
 
 ## CLI
