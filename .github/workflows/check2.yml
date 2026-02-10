@@ -49,5 +49,6 @@ jobs:
       - name: Run Shiden Brainfuck interpreter
         run: cargo run -- run examples/brainfuck
       
-      - name: Run Shiden HTTP server
-        run: cargo run -- run examples/http\ server
+      - name: Run Shiden HTTP server (with timeout)
+        timeout-minutes: 1
+        run: timeout 5s cargo run -- run examples/http\ server
