@@ -1,0 +1,36 @@
+name: Run all workflows on workflow change
+
+on:
+  push:
+    paths:
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger other workflows
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const workflows = [
+              "check.yml",
+              "check2.yml",
+              "pages.yml",
+              "release.yml",
+            ];
+            const ref = context.ref_name;
+            for (const workflow_id of workflows) {
+              core.info(`Dispatching ${workflow_id} on ${ref}`);
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id,
+                ref,
+              });
+            }
