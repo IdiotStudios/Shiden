@@ -24,7 +24,7 @@ jobs:
               "pages.yml",
               "release.yml",
             ]);
-            const ref = context.ref_name;
+            const ref = (context.ref || "").replace("refs/heads/", "") || "main";
             const { data } = await github.rest.actions.listRepoWorkflows({
               owner: context.repo.owner,
               repo: context.repo.repo,
