@@ -102,6 +102,13 @@ pub fn check_format(src: &str) -> Result<(), String> {
             return Err(format!("line {}: semicolons are not allowed", line_no));
         }
 
+        if find_unquoted(line, "#") {
+            return Err(format!(
+                "line {}: inline comments '#' are not allowed",
+                line_no
+            ));
+        }
+
         if find_unquoted(line, "//") {
             return Err(format!(
                 "line {}: inline comments '//' are not allowed",

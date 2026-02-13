@@ -3,7 +3,32 @@ use serde::Deserialize;
 use std::fs;
 use std::io::{self, Read};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+
+fn yellow(s: &str) -> String {
+    format!("\x1b[33m{}\x1b[0m", s)
+}
+
+fn red(s: &str) -> String {
+    format!("\x1b[31m{}\x1b[0m", s)
+}
+
+fn green(s: &str) -> String {
+    format!("\x1b[32m{}\x1b[0m", s)
+}
+
+fn cyan(s: &str) -> String {
+    format!("\x1b[36m{}\x1b[0m", s)
+}
+
+fn format_duration(duration: Duration) -> String {
+    let secs = duration.as_secs_f64();
+    if secs < 1.0 {
+        format!("{:.0}ms", secs * 1000.0)
+    } else {
+        format!("{:.2}s", secs)
+    }
+}
 
 fn split_error_loc(err: &str) -> (String, Option<(usize, usize)>) {
     if let Some(idx) = err.rfind(" (line ") {
@@ -46,6 +71,8 @@ pub enum Commands {
 
     Run {
         file: Option<String>,
+        #[arg(long)]
+        out: Option<String>,
     },
 
     Check {
@@ -82,7 +109,7 @@ pub fn run() {
                 Ok(prog) => println!("Parsed program: {:?}", prog),
                 Err(e) => {
                     let label = file.clone().unwrap_or_else(|| "<stdin>".into());
-                    eprintln!("Parse error: {}", format_parse_error(&label, &e));
+                    eprintln!("{}: {}", red("Parse error"), format_parse_error(&label, &e));
                     std::process::exit(2);
                 }
             },
@@ -91,7 +118,7 @@ pub fn run() {
                 std::process::exit(2);
             }
         },
-        Some(Commands::Run { file }) => match file {
+        Some(Commands::Run { file, out }) => match file {
             Some(p) => {
                 let path = std::path::Path::new(p);
                 if path.is_dir() {
@@ -113,6 +140,8 @@ pub fn run() {
                                 .unwrap_or_default();
                             let linux = targets.into_iter().find(|t| t.contains("linux"));
                             let target = linux.unwrap_or_else(|| "x86_64-linux".into());
+
+                            let compile_start = Instant::now();
                             match crate::build::compile_project(
                                 &path,
                                 &proj_name,
@@ -120,16 +149,44 @@ pub fn run() {
                                 mf.build.as_ref().and_then(|b| b.opt_level),
                             ) {
                                 Ok(exe) => {
-                                    let mut child = std::process::Command::new(&exe)
-                                        .spawn()
-                                        .unwrap_or_else(|e| {
-                                            eprintln!("failed to run: {}", e);
-                                            std::process::exit(1)
-                                        });
-                                    let _ = child.wait();
+                                    let compile_time = compile_start.elapsed();
+                                    eprintln!(
+                                        "{} {}",
+                                        green("Compiled in"),
+                                        cyan(&format_duration(compile_time))
+                                    );
+
+                                    let run_start = Instant::now();
+                                    let mut cmd = std::process::Command::new(&exe);
+                                    if let Some(out_path) = out.as_ref() {
+                                        let file =
+                                            std::fs::File::create(out_path).unwrap_or_else(|e| {
+                                                eprintln!(
+                                                    "{}: {}",
+                                                    red("Failed to open output file"),
+                                                    e
+                                                );
+                                                std::process::exit(1)
+                                            });
+                                        cmd.stdout(file);
+                                    }
+                                    let mut child = cmd.spawn().unwrap_or_else(|e| {
+                                        eprintln!("failed to run: {}", e);
+                                        std::process::exit(1)
+                                    });
+                                    let status = child.wait();
+                                    let run_time = run_start.elapsed();
+
+                                    if status.is_ok() {
+                                        eprintln!(
+                                            "{} {}",
+                                            green("Finished in"),
+                                            cyan(&format_duration(run_time))
+                                        );
+                                    }
                                 }
                                 Err(e) => {
-                                    eprintln!("Build failed: {}", e);
+                                    eprintln!("{}: {}", red("Build failed"), e);
                                     std::process::exit(2);
                                 }
                             }
@@ -142,7 +199,16 @@ pub fn run() {
                 } else if path.exists() {
                     match std::fs::read_to_string(path) {
                         Ok(src) => match compile_and_run_source(&src) {
-                            Ok(out) => print!("{}", out),
+                            Ok(out_text) => {
+                                if let Some(out_path) = out.as_ref() {
+                                    std::fs::write(out_path, out_text).unwrap_or_else(|e| {
+                                        eprintln!("{}: {}", red("Failed to write output file"), e);
+                                        std::process::exit(1)
+                                    });
+                                } else {
+                                    print!("{}", out_text)
+                                }
+                            }
                             Err(e) => {
                                 eprintln!("Execution failed: {}", e);
                                 std::process::exit(1);
@@ -156,7 +222,16 @@ pub fn run() {
                 } else {
                     match read_source(&Some(p.clone())) {
                         Ok(src) => match compile_and_run_source(&src) {
-                            Ok(out) => print!("{}", out),
+                            Ok(out_text) => {
+                                if let Some(out_path) = out.as_ref() {
+                                    std::fs::write(out_path, out_text).unwrap_or_else(|e| {
+                                        eprintln!("{}: {}", red("Failed to write output file"), e);
+                                        std::process::exit(1)
+                                    });
+                                } else {
+                                    print!("{}", out_text)
+                                }
+                            }
                             Err(e) => {
                                 eprintln!("Execution failed: {}", e);
                                 std::process::exit(1);
@@ -171,7 +246,16 @@ pub fn run() {
             }
             None => match read_source(&None) {
                 Ok(src) => match compile_and_run_source(&src) {
-                    Ok(out) => print!("{}", out),
+                    Ok(out_text) => {
+                        if let Some(out_path) = out.as_ref() {
+                            std::fs::write(out_path, out_text).unwrap_or_else(|e| {
+                                eprintln!("{}: {}", red("Failed to write output file"), e);
+                                std::process::exit(1)
+                            });
+                        } else {
+                            print!("{}", out_text)
+                        }
+                    }
                     Err(e) => {
                         eprintln!("Execution failed: {}", e);
                         std::process::exit(1);

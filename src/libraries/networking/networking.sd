@@ -1,144 +1,144 @@
 # HTTP Client Operations
-fn new net http get(url/str)/str
+fn new net http get(url)/str
     __net_http_get(url)/str
 fn/
 
-fn new net http post(url/str, body/str)/str
+fn new net http post(url, body)/str
     __net_http_post(url, body)/str
 fn/
 
-fn new net http put(url/str, body/str)/str
+fn new net http put(url, body)/str
     __net_http_put(url, body)/str
 fn/
 
-fn new net http delete(url/str)/str
+fn new net http delete(url)/str
     __net_http_delete(url)/str
 fn/
 
 # HTTP Server Operations
-fn new net server new(port/i64)/i64
+fn new net server new(port)/i64
     __net_server_new(port)/i64
 fn/
 
-fn new net server route(server/i64, path/str, method/str)/unit
+fn new net server route(server, path, method)/unit
     __net_server_route(server, path, method)/unit
 fn/
 
-fn new net server start(server/i64)/unit
+fn new net server start(server)/unit
     __net_server_start(server)/unit
 fn/
 
-fn new net server stop(server/i64)/unit
+fn new net server stop(server)/unit
     __net_server_stop(server)/unit
 fn/
 
 # File Serving
-fn new net file serve_dir(path/str, port/i64)/unit
+fn new net file serve_dir(path, port)/unit
     __net_file_serve_dir(path, port)/unit
 fn/
 
 # JSON Operations
-fn new net json parse(data/str)/str
+fn new net json parse(data)/str
     __net_json_parse(data)/str
 fn/
 
-fn new net json stringify(obj/str)/str
+fn new net json stringify(obj)/str
     __net_json_stringify(obj)/str
 fn/
 
-fn new net json get(obj/str, key/str)/str
+fn new net json get(obj, key)/str
     __net_json_get(obj, key)/str
 fn/
 
-fn new net json set(obj/str, key/str, value/str)/str
+fn new net json set(obj, key, value)/str
     __net_json_set(obj, key, value)/str
 fn/
 
 # URL Operations
-fn new net url parse(url/str)/str
+fn new net url parse(url)/str
     __net_url_parse(url)/str
 fn/
 
-fn new net url encode(str/str)/str
+fn new net url encode(str)/str
     __net_url_encode(str)/str
 fn/
 
-fn new net url decode(str/str)/str
+fn new net url decode(str)/str
     __net_url_decode(str)/str
 fn/
 
 # WebSocket Operations
-fn new net websocket connect(url/str)/i64
+fn new net websocket connect(url)/i64
     __net_websocket_connect(url)/i64
 fn/
 
-fn new net websocket send(ws/i64, data/str)/unit
+fn new net websocket send(ws, data)/unit
     __net_websocket_send(ws, data)/unit
 fn/
 
-fn new net websocket close(ws/i64)/unit
+fn new net websocket close(ws)/unit
     __net_websocket_close(ws)/unit
 fn/
 
 # TCP Socket Operations
-fn new net tcp server new(port/i64)/i64
+fn new net tcp server new(port)/i64
     __net_tcp_server_new(port)/i64
 fn/
 
-fn new net tcp server accept(server/i64)/i64
+fn new net tcp server accept(server)/i64
     __net_tcp_server_accept(server)/i64
 fn/
 
-fn new net tcp connect(host/str, port/i64)/i64
+fn new net tcp connect(host, port)/i64
     __net_tcp_connect(host, port)/i64
 fn/
 
-fn new net tcp send(socket/i64, data/str)/unit
+fn new net tcp send(socket, data)/unit
     __net_tcp_send(socket, data)/unit
 fn/
 
-fn new net tcp recv(socket/i64)/str
+fn new net tcp recv(socket)/str
     __net_tcp_recv(socket)/str
 fn/
 
-fn new net tcp close(socket/i64)/unit
+fn new net tcp close(socket)/unit
     __net_tcp_close(socket)/unit
 fn/
 
 # UDP Socket Operations
-fn new net udp socket new(port/i64)/i64
+fn new net udp socket new(port)/i64
     __net_udp_socket_new(port)/i64
 fn/
 
-fn new net udp send(socket/i64, addr/str, data/str)/unit
+fn new net udp send(socket, addr, data)/unit
     __net_udp_send(socket, addr, data)/unit
 fn/
 
-fn new net udp recv(socket/i64)/str
+fn new net udp recv(socket)/str
     __net_udp_recv(socket)/str
 fn/
 
-fn new net udp close(socket/i64)/unit
+fn new net udp close(socket)/unit
     __net_udp_close(socket)/unit
 fn/
 
 # Web Scraping Operations
-fn new net scrape page(url/str)/str
+fn new net scrape page(url)/str
     __net_scrape_page(url)/str
 fn/
 
-fn new net scrape extract_text(html/str)/str
+fn new net scrape extract_text(html)/str
     __net_scrape_extract_text(html)/str
 fn/
 
-fn new net scrape extract_links(html/str)/str
+fn new net scrape extract_links(html)/str
     __net_scrape_extract_links(html)/str
 fn/
 
-fn new net scrape select(html/str, selector/str)/str
+fn new net scrape select(html, selector)/str
     __net_scrape_select(html, selector)/str
 fn/
 
-fn new net scrape attr(html/str, selector/str, attr/str)/str
+fn new net scrape attr(html, selector, attr)/str
     __net_scrape_attr(html, selector, attr)/str
 fn/

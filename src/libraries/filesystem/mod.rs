@@ -1,4 +1,5 @@
-use std::collections::BTreeMap;
+use std::fs;
+use std::path::Path;
 
 pub mod helpers {
     use std::collections::BTreeMap;
@@ -26,14 +27,181 @@ pub mod helpers {
     }
 }
 
+fn cstr_to_string(ptr: usize, memory: &[u8]) -> Result<String, String> {
+    if ptr == 0 {
+        return Err("Null pointer".to_string());
+    }
+
+    let mut result = String::new();
+    let mut i = ptr;
+    while i < memory.len() && memory[i] != 0 {
+        result.push(memory[i] as char);
+        i += 1;
+    }
+    Ok(result)
+}
+
 pub fn allocate_string(content: &str) -> (usize, Vec<u8>) {
     let bytes = content.as_bytes().to_vec();
     let len = bytes.len();
     (len, bytes)
 }
 
-pub fn fs_read_impl(path_ptr: usize, memory: &mut Vec<u8>) -> usize {
-    "file_contents".len()
+pub fn fs_read(path: &str) -> Result<String, String> {
+    fs::read_to_string(path).map_err(|e| format!("Failed to read file '{}': {}", path, e))
 }
 
-pub fn fs_write_impl(path_ptr: usize, content_ptr: usize, memory: &Vec<u8>) {}
+pub fn fs_write(path: &str, content: &str) -> Result<(), String> {
+    fs::write(path, content).map_err(|e| format!("Failed to write file '{}': {}", path, e))
+}
+
+pub fn fs_exists(path: &str) -> i64 {
+    if Path::new(path).exists() { 1 } else { 0 }
+}
+
+pub fn fs_delete_file(path: &str) -> Result<(), String> {
+    fs::remove_file(path).map_err(|e| format!("Failed to delete file '{}': {}", path, e))
+}
+
+pub fn fs_file_size(path: &str) -> Result<i64, String> {
+    fs::metadata(path)
+        .map(|m| m.len() as i64)
+        .map_err(|e| format!("Failed to get file size '{}': {}", path, e))
+}
+
+pub fn fs_mkdir(path: &str) -> Result<(), String> {
+    fs::create_dir_all(path).map_err(|e| format!("Failed to create directory '{}': {}", path, e))
+}
+
+pub fn fs_list_dir(path: &str) -> Result<String, String> {
+    let entries =
+        fs::read_dir(path).map_err(|e| format!("Failed to list directory '{}': {}", path, e))?;
+
+    let mut files = Vec::new();
+    for entry in entries {
+        match entry {
+            Ok(e) => {
+                if let Ok(name) = e.file_name().into_string() {
+                    files.push(name);
+                }
+            }
+            Err(_) => continue,
+        }
+    }
+
+    Ok(files.join("\n"))
+}
+
+pub fn fs_edit(path: &str, key: &str, value: &str) -> Result<(), String> {
+    fs_edit_strategy(path, key, value, "replace")
+}
+
+pub fn fs_edit_strategy(path: &str, key: &str, value: &str, strategy: &str) -> Result<(), String> {
+    let content = fs::read_to_string(path).unwrap_or_else(|_| "{}".to_string());
+
+    let mut json: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| format!("Invalid JSON in '{}': {}", path, e))?;
+
+    let parsed_value: serde_json::Value = serde_json::from_str(value)
+        .unwrap_or_else(|_| serde_json::Value::String(value.to_string()));
+
+    match strategy {
+        "replace" => {
+            json[key] = parsed_value;
+        }
+        "merge" => {
+            if let (Some(obj), serde_json::Value::Object(val_map)) =
+                (json.as_object_mut(), &parsed_value)
+            {
+                for (k, v) in val_map {
+                    obj.insert(k.clone(), v.clone());
+                }
+            }
+        }
+        "append" => {
+            if !json[key].is_array() {
+                json[key] = serde_json::json!([]);
+            }
+            json[key].as_array_mut().unwrap().push(parsed_value);
+        }
+        "unique" => {
+            if !json[key].is_array() {
+                json[key] = serde_json::json!([]);
+            }
+            let arr = json[key].as_array_mut().unwrap();
+            if !arr.contains(&parsed_value) {
+                arr.push(parsed_value);
+            }
+        }
+        _ => return Err(format!("Unknown strategy: {}", strategy)),
+    }
+
+    fs::write(path, json.to_string())
+        .map_err(|e| format!("Failed to write JSON file '{}': {}", path, e))
+}
+
+pub fn fs_delete(path: &str, key: &str) -> Result<(), String> {
+    let content =
+        fs::read_to_string(path).map_err(|e| format!("Failed to read '{}': {}", path, e))?;
+
+    let mut json: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| format!("Invalid JSON in '{}': {}", path, e))?;
+
+    if let Some(obj) = json.as_object_mut() {
+        obj.remove(key);
+    }
+
+    fs::write(path, json.to_string())
+        .map_err(|e| format!("Failed to write JSON file '{}': {}", path, e))
+}
+
+pub fn fs_array_append(path: &str, key: &str, value: &str) -> Result<(), String> {
+    let content = fs::read_to_string(path).unwrap_or_else(|_| "{}".to_string());
+
+    let mut json: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| format!("Invalid JSON in '{}': {}", path, e))?;
+
+    if !json[key].is_array() {
+        json[key] = serde_json::json!([]);
+    }
+
+    let parsed_value: serde_json::Value = serde_json::from_str(value)
+        .unwrap_or_else(|_| serde_json::Value::String(value.to_string()));
+
+    json[key].as_array_mut().unwrap().push(parsed_value);
+
+    fs::write(path, json.to_string())
+        .map_err(|e| format!("Failed to write JSON file '{}': {}", path, e))
+}
+
+pub fn fs_merge(path: &str, json_str: &str) -> Result<(), String> {
+    let file_content = fs::read_to_string(path).unwrap_or_else(|_| "{}".to_string());
+
+    let mut file_json: serde_json::Value = serde_json::from_str(&file_content)
+        .map_err(|e| format!("Invalid JSON in '{}': {}", path, e))?;
+
+    let merge_json: serde_json::Value =
+        serde_json::from_str(json_str).map_err(|e| format!("Invalid JSON to merge: {}", e))?;
+
+    deep_merge(&mut file_json, merge_json);
+
+    fs::write(path, file_json.to_string())
+        .map_err(|e| format!("Failed to write JSON file '{}': {}", path, e))
+}
+
+fn deep_merge(target: &mut serde_json::Value, source: serde_json::Value) {
+    match (target, source) {
+        (serde_json::Value::Object(target_map), serde_json::Value::Object(source_map)) => {
+            for (key, value) in source_map {
+                if target_map.contains_key(&key) {
+                    deep_merge(&mut target_map[&key], value);
+                } else {
+                    target_map.insert(key, value);
+                }
+            }
+        }
+        (target_ref, source_ref) => {
+            *target_ref = source_ref;
+        }
+    }
+}

@@ -58,6 +58,134 @@ fn resolve_imports(proj_dir: &Path, prog: &mut crate::syntax::Program) -> Result
     Ok(())
 }
 
+fn check_dead_code(prog: &crate::syntax::Program) {
+    use crate::syntax::{Expr, Item, Stmt};
+    use std::collections::HashSet;
+
+    let mut defined_functions: HashMap<String, String> = HashMap::new();
+
+    for item in &prog.items {
+        if let Item::Function {
+            name, params, ret, ..
+        } = item
+        {
+            let params_str = params
+                .iter()
+                .map(|(pname, pty)| {
+                    if let Some(t) = pty {
+                        format!("{}/{}", pname, t)
+                    } else {
+                        pname.clone()
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            let ret_str = if let Some(r) = ret {
+                format!("/{}", r)
+            } else {
+                String::new()
+            };
+
+            let signature = format!("fn new {}({}){}", name, params_str, ret_str);
+            defined_functions.insert(name.clone(), signature);
+        }
+    }
+
+    let mut called_functions = HashSet::new();
+
+    fn collect_calls_from_expr(expr: &Expr, calls: &mut HashSet<String>) {
+        match expr {
+            Expr::Call { name, args } => {
+                calls.insert(name.clone());
+                for arg in args {
+                    collect_calls_from_expr(arg, calls);
+                }
+            }
+            Expr::Binary { left, right, .. } => {
+                collect_calls_from_expr(left, calls);
+                collect_calls_from_expr(right, calls);
+            }
+            Expr::Unary { expr, .. } => {
+                collect_calls_from_expr(expr, calls);
+            }
+            Expr::Index { expr, index } => {
+                collect_calls_from_expr(expr, calls);
+                collect_calls_from_expr(index, calls);
+            }
+            Expr::ArrayLiteral(exprs) => {
+                for e in exprs {
+                    collect_calls_from_expr(e, calls);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn collect_calls_from_stmt(stmt: &Stmt, calls: &mut HashSet<String>) {
+        match stmt {
+            Stmt::Let { value, .. } => {
+                collect_calls_from_expr(value, calls);
+            }
+            Stmt::Assign { value, .. } => {
+                collect_calls_from_expr(value, calls);
+            }
+            Stmt::Expr(expr) => {
+                collect_calls_from_expr(expr, calls);
+            }
+            Stmt::Return(expr, _) => {
+                collect_calls_from_expr(expr, calls);
+            }
+            Stmt::If {
+                cond,
+                then_block,
+                else_block,
+            } => {
+                collect_calls_from_expr(cond, calls);
+                for s in then_block {
+                    collect_calls_from_stmt(s, calls);
+                }
+                if let Some(else_blk) = else_block {
+                    for s in else_blk {
+                        collect_calls_from_stmt(s, calls);
+                    }
+                }
+            }
+            Stmt::While { cond, body } => {
+                collect_calls_from_expr(cond, calls);
+                for s in body {
+                    collect_calls_from_stmt(s, calls);
+                }
+            }
+            Stmt::For { iterable, body, .. } => {
+                collect_calls_from_expr(iterable, calls);
+                for s in body {
+                    collect_calls_from_stmt(s, calls);
+                }
+            }
+            Stmt::AssignIndex { index, value, .. } => {
+                collect_calls_from_expr(index, calls);
+                collect_calls_from_expr(value, calls);
+            }
+            _ => {}
+        }
+    }
+
+    for item in &prog.items {
+        if let Item::Function { body, .. } = item {
+            for stmt in body {
+                collect_calls_from_stmt(stmt, &mut called_functions);
+            }
+        }
+    }
+
+    for (func_name, signature) in &defined_functions {
+        if func_name != "main" && !called_functions.contains(func_name) {
+            eprintln!("\x1b[33mWARNING\x1b[0m: {} is not called", signature);
+        }
+    }
+}
+
 pub fn compile_project(
     proj_dir: &Path,
     proj_name: &str,
@@ -74,6 +202,8 @@ pub fn compile_project(
     let mut prog = crate::frontend::parse(&src).map_err(|e| format!("Parse error: {}", e))?;
 
     resolve_imports(proj_dir, &mut prog)?;
+
+    check_dead_code(&prog);
 
     let main = prog
         .items
