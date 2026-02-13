@@ -1,6 +1,6 @@
 export function initHeader(root = document) {
-  const toggle = root.querySelector('.header-section__toggle');
-  const links = root.querySelector('.header-section__links');
+  const toggle = root.querySelector('.menu-toggle');
+  const links = root.querySelector('.nav-links');
   if (!toggle || !links) return;
 
   const setExpanded = (v) => toggle.setAttribute('aria-expanded', String(v));
@@ -17,12 +17,14 @@ export function initHeader(root = document) {
   }));
 
   document.addEventListener('click', (e) => {
-    if (!e.target.closest('.header-section')) {
+    if (!e.target.closest('.header')) {
       links.classList.remove('active');
       setExpanded(false);
     }
   });
 }
+
+const htmlCache = {};
 
 export async function loadHeader() {
   const container = document.getElementById('site-header');
@@ -30,10 +32,12 @@ export async function loadHeader() {
 
   if (container.innerHTML.trim() === '') {
     try {
-      const res = await fetch('/header.html');
-      if (!res.ok) throw new Error('Failed to fetch /header.html: ' + res.status);
-      const html = await res.text();
-      container.innerHTML = html;
+      if (!htmlCache.header) {
+        const res = await fetch('/header.html');
+        if (!res.ok) throw new Error('Failed to fetch /header.html: ' + res.status);
+        htmlCache.header = await res.text();
+      }
+      container.innerHTML = htmlCache.header;
     } catch (err) {
       console.error('loadHeader error:', err);
       return;
@@ -42,8 +46,6 @@ export async function loadHeader() {
 
   initHeader(container);
 }
-
-loadHeader();
 
 export function initFooter(root = document) {
   const year = String(new Date().getFullYear());
@@ -64,10 +66,12 @@ export async function loadFooter() {
 
   if (container.innerHTML.trim() === '') {
     try {
-      const res = await fetch('/footer.html');
-      if (!res.ok) throw new Error('Failed to fetch /footer.html: ' + res.status);
-      const html = await res.text();
-      container.innerHTML = html;
+      if (!htmlCache.footer) {
+        const res = await fetch('/footer.html');
+        if (!res.ok) throw new Error('Failed to fetch /footer.html: ' + res.status);
+        htmlCache.footer = await res.text();
+      }
+      container.innerHTML = htmlCache.footer;
     } catch (err) {
       console.error('loadFooter error:', err);
       return;
@@ -77,4 +81,4 @@ export async function loadFooter() {
   initFooter(container);
 }
 
-loadFooter();
+Promise.all([loadHeader(), loadFooter()]);

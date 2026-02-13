@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Shiden — Documentation</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="modulepreload" href="/script.js">
+  <link rel="modulepreload" href="/docs/docs.js">
+  <link rel="prefetch" href="/header.html">
+  <link rel="prefetch" href="/footer.html">
+  <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+</head>
+
+<body>
+  <div id="site-header"></div>
+  <script type="module" src="/script.js"></script>
+
+  <div class="docs-container">
+    <aside class="docs-sidebar">
+      <div class="sidebar-header">
+        <h2>Documentation</h2>
+        <input type="text" id="docs-search" class="docs-search" placeholder="Search docs...">
+      </div>
+      <nav id="docs-nav" class="docs-nav">
+        <div class="loading">Loading documentation...</div>
+      </nav>
+    </aside>
+
+    <main class="docs-content">
+      <div id="doc-display">
+        <div class="loading">Select a document from the sidebar</div>
+      </div>
+    </main>
+  </div>
+
+  <div id="site-footer"></div>
+  <script type="module" src="/docs/docs.js"></script>
+  <script>
+    // Hide Hack Club banner on docs page
+    const observer = new MutationObserver(() => {
+      const banner = document.getElementById('hack-club-banner');
+      if (banner) {
+        banner.style.display = 'none';
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  </script>
+</body>
+</html>
