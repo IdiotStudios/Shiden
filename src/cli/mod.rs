@@ -21,6 +21,41 @@ fn cyan(s: &str) -> String {
     format!("\x1b[36m{}\x1b[0m", s)
 }
 
+fn get_current_platform_target() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "x86_64-windows"
+    } else if cfg!(target_os = "macos") {
+        "x86_64-macos"
+    } else {
+        "x86_64-linux"
+    }
+}
+
+fn select_target(targets: Vec<String>) -> String {
+    if targets.is_empty() {
+        return get_current_platform_target().to_string();
+    }
+
+    let current_platform = get_current_platform_target();
+
+    if let Some(target) = targets.iter().find(|t| {
+        if cfg!(target_os = "windows") {
+            t.contains("windows")
+        } else if cfg!(target_os = "macos") {
+            t.contains("macos")
+        } else {
+            t.contains("linux")
+        }
+    }) {
+        return target.clone();
+    }
+
+    targets
+        .first()
+        .cloned()
+        .unwrap_or_else(|| current_platform.to_string())
+}
+
 fn format_duration(duration: Duration) -> String {
     let secs = duration.as_secs_f64();
     if secs < 1.0 {
@@ -138,8 +173,7 @@ pub fn run() {
                                 .as_ref()
                                 .and_then(|b| b.targets.clone())
                                 .unwrap_or_default();
-                            let linux = targets.into_iter().find(|t| t.contains("linux"));
-                            let target = linux.unwrap_or_else(|| "x86_64-linux".into());
+                            let target = select_target(targets);
 
                             let compile_start = Instant::now();
                             match crate::build::compile_project(

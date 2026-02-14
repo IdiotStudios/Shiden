@@ -16,6 +16,25 @@ Which are:
 * [Networking](src/libraries/networking)
 * [Filesystem](src/libraries/filesystem)
 
+## Multi-Platform Compilation
+
+Shiden supports compiling for multiple platforms. The compiler automatically detects your current platform and builds for it, with the ability to cross-compile to other targets.
+
+### Supported Platforms
+
+* **Linux** (`x86_64-linux`) - Implemented
+* **Windows** (`x86_64-windows`) - Next up
+* **macOS** (`x86_64-macos`) - Planned (after Windows)
+
+### Configure Targets
+
+Specify your target platforms in `shiden.toml`:
+
+```toml
+[build]
+opt_level = 3
+targets = ["x86_64-linux", "x86_64-windows", "x86_64-macos"]
+```
 
 ## CLI
 
@@ -41,26 +60,28 @@ my_project/
 │   └── main.sd         // Executable entry  
 ├── tests/  
 │   └── example.sd  
-├── build/              // Compiled binaries  
-├── cache/              // Cache  
+├── build/              // Compiled binaries
+│   ├── cache/   // Build cache
+│   ├── x86_64-linux/   // Linux target
+│   ├── x86_64-windows/ // Windows target
+│   └── x86_64-macos/   // macOS target
 └── README.md  
 ```
 
 shiden.toml:
 ```toml
-  [package]
+  [project]
   name = "my_project"
   version = "0.1.0"
   license = "MIT"
 
   [build]
-  # 0-3
   opt_level = 3
-  targets = ["x86_64-linux", "x86_64-windows"]
+  # Target platforms to compile for
+  targets = ["x86_64-linux", "x86_64-windows", "x86_64-macos"]
 ```
 
 ## Contributing
-
 If you do wanna contribute <3 then feel free to create issues or pull requests! I love the support.
 
 ## License

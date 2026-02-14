@@ -6,7 +6,7 @@ type = "binary"
 
 [build]
 opt_level = 3
-targets = ["x86_64-linux", "x86_64-windows"]
+targets = ["x86_64-linux", "x86_64-windows", "x86_64-macos"]
 
 [dependencies]
 # "pkg" = "version"

@@ -8,6 +8,29 @@ use std::process::Command;
 use crate::frontend;
 use crate::libraries::runtime_helpers;
 
+fn get_binary_format(target: &str) -> Result<BinaryFormat, String> {
+    if target.contains("windows") {
+        Ok(BinaryFormat::Pe)
+    } else if target.contains("linux") {
+        Ok(BinaryFormat::Elf)
+    } else if target.contains("macos") {
+        Ok(BinaryFormat::MachO)
+    } else {
+        Err(format!(
+            "Unsupported target: {}, contact us if you want support",
+            target
+        ))
+    }
+}
+
+fn get_executable_extension(target: &str) -> &'static str {
+    if target.contains("windows") {
+        ".exe"
+    } else {
+        ""
+    }
+}
+
 fn resolve_imports(proj_dir: &Path, prog: &mut crate::syntax::Program) -> Result<(), String> {
     let mut imports = Vec::new();
     let mut remaining_items = Vec::new();
@@ -192,9 +215,7 @@ pub fn compile_project(
     target: &str,
     opt_level: Option<i32>,
 ) -> Result<PathBuf, String> {
-    if !target.contains("linux") {
-        return Err("Only linux targets supported for this backend".into());
-    }
+    let binary_format = get_binary_format(target)?;
 
     let main_path = proj_dir.join("src").join("main.sd");
     let src = std::fs::read_to_string(&main_path)
@@ -946,7 +967,7 @@ pub fn compile_project(
         }
     }
 
-    let mut obj = Object::new(BinaryFormat::Elf, Architecture::X86_64, Endianness::Little);
+    let mut obj = Object::new(binary_format, Architecture::X86_64, Endianness::Little);
 
     let text_id = obj.section_id(StandardSection::Text);
     let data_id = obj.section_id(StandardSection::Data);
@@ -1624,7 +1645,8 @@ pub fn compile_project(
     file_bytes.extend_from_slice(&text);
     file_bytes.extend_from_slice(&rodata);
 
-    let exe_path = out_dir.join(proj_name);
+    let exe_name = format!("{}{}", proj_name, get_executable_extension(target));
+    let exe_path = out_dir.join(&exe_name);
     {
         use std::io::Write;
         let mut f =
