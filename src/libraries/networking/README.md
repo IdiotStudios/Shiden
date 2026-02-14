@@ -1,5 +1,25 @@
 # Networking Library
 
+## Note:
+- This library is partialy completed
+
+### Incomplete features:
+
+- TCP sockets (tcp_server_accept, tcp_send, tcp_recv, tcp_close just return placeholders)
+- UDP sockets (udp_send, udp_recv, udp_close are empty stubs)
+- WebSocket (all functions are stubs returning dummy values)
+- HTTP server routing (routes are stored but not used; server only returns static response)
+- Server stop functionality (does nothing)
+
+### Completed features:
+
+- HTTP client (GET, POST, PUT, DELETE)
+- JSON operations (parse, stringify, get, set)
+- URL operations (parse, encode, decode)
+- Web scraping (page, extract_text, extract_links, select, attr)
+- File serving
+- Low-level assembly helpers 
+
 ## HTTP Client
 
 ```shiden
