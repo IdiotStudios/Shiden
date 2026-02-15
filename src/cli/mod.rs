@@ -571,7 +571,7 @@ mod tests {
         let args = vec!["shiden", "run"];
         let cli = Cli::parse_from(args);
         match cli.command.unwrap() {
-            Commands::Run { file } => assert!(file.is_none()),
+            Commands::Run { file, .. } => assert!(file.is_none()),
             _ => panic!("expected run subcommand"),
         }
     }

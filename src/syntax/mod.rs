@@ -494,6 +494,7 @@ mod tests {
                 assert_eq!(name, "greet");
                 assert_eq!(params.len(), 0);
             }
+            _ => panic!("expected function"),
         }
     }
 
@@ -552,7 +553,7 @@ mod tests {
 
     #[test]
     fn lex_brainfuck_example() {
-        let src = std::fs::read_to_string("examples/src/main.sd").expect("read example");
+        let src = std::fs::read_to_string("examples/brainfuck/src/main.sd").expect("read example");
         let mut l = Lexer::new(&src);
         let mut toks = Vec::new();
         loop {

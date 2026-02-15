@@ -8,6 +8,27 @@ VSCode-Extension: [here](https://marketplace.visualstudio.com/items?itemName=Idi
 Flavortown-Project: [here](https://flavortown.hackclub.com/projects/10866)  
 Browser-Extension: (hint...)
 
+## Todo
+
+- Static Translation Layer (STL) for cross-platform compatibility
+- Improved error messages with code snippets and suggestions
+- Support for more platforms (Windows, macOS)
+- Built-in libraries for common tasks (networking, filesystem, etc.)
+- Documentation and more examples
+- Unsafe code blocks for low-level operations
+- Better testing framework and support for unit/integration tests (future plan)
+- IDE integration and language server support (future plan)
+- Performance optimizations and benchmarking tools (future plan)
+- Split the compiler into multiple stages (lexer, parser, semantic analysis, code generation) for better modularity and maintainability (future plan)
+- Support for more data types and features (enums, traits, async/await, etc.) (future plan)
+- A standard library for common utilities and data structures (future plan)
+- A REPL for interactive coding and experimentation (future plan)
+- A web-based playground for trying out Shiden code without installing anything (future plan)
+- A LLM-based code assistant for generating code snippets and providing suggestions (future plan)
+- A community-driven package registry for sharing and discovering libraries (future plan)
+- ISO compilation target for OS development (future plan)
+- WebAssembly target for running Shiden code in the browser (future plan)
+
 ## Libraries
 
 Shiden has built in [libraries](src/libraries).  

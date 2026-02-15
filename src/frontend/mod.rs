@@ -923,6 +923,7 @@ mod tests {
                 assert_eq!(params.len(), 0);
                 assert_eq!(body.len(), 2);
             }
+            _ => panic!("expected function"),
         }
     }
 
@@ -944,24 +945,26 @@ mod tests {
                 );
                 assert_eq!(body.len(), 1);
             }
+            _ => panic!("expected function"),
         }
     }
 
     #[test]
     fn parse_if_else() {
-        let src = "fn new main/\n    if 1 == 1/\n        println(\"yes\")/unit\n    else/\n        println(\"no\")/unit\n    fn/\nfn/";
+        let src = "fn new main/\n    if 1 == 1/\n        println(\"yes\")/unit\n    else/\n        println(\"no\")/unit\n    if/\nfn/";
         let res = parse(src).expect("parse failed");
         match &res.items[0] {
             Item::Function { name, body, .. } => {
                 assert_eq!(name, "main");
                 assert_eq!(body.len(), 1);
             }
+            _ => panic!("expected function"),
         }
     }
 
     #[test]
     fn parse_while_simple() {
-        let src = "fn new main/\n    let mut x = 0/i64\n    while x < 3/\n        x = x + 1/i64\n    fn/\n    println(\"{}\", x)/unit\nfn/";
+        let src = "fn new main/\n    let mut x = 0/i64\n    while x < 3/\n        x = x + 1/i64\n    while/\n    println(\"{}\", x)/unit\nfn/";
         let res = parse(src).expect("parse failed");
         match &res.items[0] {
             Item::Function { name, body, .. } => {
@@ -972,6 +975,7 @@ mod tests {
                     other => panic!("expected while, got {:?}", other),
                 }
             }
+            _ => panic!("expected function"),
         }
     }
 
@@ -1000,6 +1004,7 @@ mod tests {
                     other => panic!("unexpected stmt: {:?}", other),
                 }
             }
+            _ => panic!("expected function"),
         }
     }
 
@@ -1011,6 +1016,7 @@ mod tests {
             Item::Function { body, .. } => {
                 assert_eq!(body.len(), 3);
             }
+            _ => panic!("expected function"),
         }
     }
 
@@ -1042,29 +1048,20 @@ mod tests {
                     other => panic!("expected expr, got {:?}", other),
                 }
             }
+            _ => panic!("expected function"),
         }
     }
 
     #[test]
     fn debug_parse_brainfuck_example() {
-        let src = std::fs::read_to_string("examples/src/main.sd").expect("read example");
-        let mut p = Parser::new(&src);
-        loop {
-            println!("CUR {:?} PEEK {:?}", p.cur, p.peek);
-            match p.parse_stmt() {
-                Ok(Some(s)) => println!("Parsed stmt: {:?}", s),
-                Ok(None) => {
-                    println!("no more stmts");
-                    break;
-                }
-                Err(e) => panic!("parse error at cur {:?} peek {:?}: {}", p.cur, p.peek, e),
-            }
-        }
+        let src = std::fs::read_to_string("examples/brainfuck/src/main.sd").expect("read example");
+        let prog = crate::frontend::parse(&src).expect("parse example");
+        assert!(!prog.items.is_empty());
     }
 
     #[test]
     fn debug_parse_brainfuck_function() {
-        let src = std::fs::read_to_string("examples/src/main.sd").expect("read example");
+        let src = std::fs::read_to_string("examples/brainfuck/src/main.sd").expect("read example");
         let mut p = Parser::new(&src);
 
         while !(matches!(&p.cur, Token::Fn) && matches!(&p.peek, Token::New)) {

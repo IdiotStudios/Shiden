@@ -251,6 +251,7 @@ pub fn compile_project(
         Call(String, usize),
         Ret,
         EmitInt,
+        EmitChar,
         StoreLocal(usize),
         LoadLocal(usize),
         Pop,
@@ -606,31 +607,67 @@ pub fn compile_project(
                         }
                         if i < placeholders {
                             let arg_expr = &args[i + 1];
+
                             if let Some(v) = eval_const_integer(arg_expr) {
                                 res.push(IrInstr::EmitString(format!("{}", v)));
-                            } else {
-                                if let Expr::StringLiteral(s) = arg_expr {
-                                    res.push(IrInstr::EmitString(s.clone()));
-                                } else if let Expr::Identifier(id) = arg_expr {
-                                    if matches!(types.get(id).map(String::as_str), Some("str")) {
-                                        lower_expr_to_ir(
-                                            arg_expr, &mut res, locals, next_local, next_label,
-                                        )?;
-                                        res.push(IrInstr::Call("__print_str".into(), 1));
-                                        res.push(IrInstr::Pop);
-                                    } else {
-                                        lower_expr_to_ir(
-                                            arg_expr, &mut res, locals, next_local, next_label,
-                                        )?;
-                                        res.push(IrInstr::EmitInt);
-                                    }
-                                } else {
+                                continue;
+                            }
+
+                            if let Expr::Char(c) = arg_expr {
+                                res.push(IrInstr::EmitString(format!("{}", c)));
+                                continue;
+                            }
+
+                            if let Expr::StringLiteral(s) = arg_expr {
+                                res.push(IrInstr::EmitString(s.clone()));
+                                continue;
+                            }
+
+                            if let Expr::Identifier(id) = arg_expr {
+                                if matches!(types.get(id).map(String::as_str), Some("str")) {
                                     lower_expr_to_ir(
                                         arg_expr, &mut res, locals, next_local, next_label,
                                     )?;
-                                    res.push(IrInstr::EmitInt);
+                                    res.push(IrInstr::Call("__print_str".into(), 1));
+                                    res.push(IrInstr::Pop);
+                                    continue;
+                                }
+                                if matches!(types.get(id).map(String::as_str), Some("char")) {
+                                    lower_expr_to_ir(
+                                        arg_expr, &mut res, locals, next_local, next_label,
+                                    )?;
+                                    res.push(IrInstr::EmitChar);
+                                    continue;
+                                }
+
+                                lower_expr_to_ir(
+                                    arg_expr, &mut res, locals, next_local, next_label,
+                                )?;
+                                res.push(IrInstr::EmitInt);
+                                continue;
+                            }
+
+                            if let Expr::Index {
+                                expr: arr,
+                                index: _,
+                            } = arg_expr
+                            {
+                                if let Expr::Identifier(base_id) = arr.as_ref() {
+                                    if matches!(
+                                        types.get(base_id).map(String::as_str),
+                                        Some("array<char>")
+                                    ) {
+                                        lower_expr_to_ir(
+                                            arg_expr, &mut res, locals, next_local, next_label,
+                                        )?;
+                                        res.push(IrInstr::EmitChar);
+                                        continue;
+                                    }
                                 }
                             }
+
+                            lower_expr_to_ir(arg_expr, &mut res, locals, next_local, next_label)?;
+                            res.push(IrInstr::EmitInt);
                         }
                     }
                     res.push(IrInstr::EmitString("\n".to_string()));
@@ -638,6 +675,29 @@ pub fn compile_project(
                 }
                 Err("first argument to println must be a string literal format".into())
             }
+            Stmt::Expr(Expr::Call { name, args }) if name == "push" => {
+                if args.len() == 2 {
+                    if let Expr::Identifier(arr_name) = &args[0] {
+                        if let Expr::Char(_) = &args[1] {
+                            types.insert(arr_name.clone(), "array<char>".to_string());
+                        }
+                    }
+                }
+                let mut res = Vec::new();
+                lower_expr_to_ir(
+                    &Expr::Call {
+                        name: name.clone(),
+                        args: args.clone(),
+                    },
+                    &mut res,
+                    locals,
+                    next_local,
+                    next_label,
+                )?;
+                res.push(IrInstr::Pop);
+                return Ok(res);
+            }
+
             Stmt::Expr(expr) => {
                 let mut res = Vec::new();
                 lower_expr_to_ir(expr, &mut res, locals, next_local, next_label)?;
@@ -1176,6 +1236,39 @@ pub fn compile_project(
                 reloc_entries.push(RelocEntry {
                     offset: imm64_off as usize,
                     sym_name: Some(b"_print_i64".to_vec()),
+                    is_call: false,
+                });
+            }
+            IrInstr::EmitChar => {
+                text.push(0x5F);
+
+                text.push(0x53);
+                text.extend_from_slice(&[0x48, 0x81, 0xEC]);
+                text.write_i32::<LittleEndian>(0x80).unwrap();
+
+                text.extend_from_slice(&[0x48, 0x89, 0xE3]);
+
+                text.extend_from_slice(&[0x48, 0x81, 0xE4]);
+                text.write_u32::<LittleEndian>(0xFFFFFFF0u32).unwrap();
+
+                text.extend_from_slice(&[0x48, 0x89, 0xE6]);
+                text.extend_from_slice(&[0x48, 0x83, 0xEE, 0x40]);
+
+                text.extend_from_slice(&[0x48, 0xB8]);
+                let imm64_off = text.len();
+                text.write_u64::<LittleEndian>(0).unwrap();
+
+                text.extend_from_slice(&[0xFF, 0xD0]);
+
+                text.extend_from_slice(&[0x48, 0x89, 0xDC]);
+
+                text.extend_from_slice(&[0x48, 0x81, 0xC4]);
+                text.write_i32::<LittleEndian>(0x80).unwrap();
+                text.push(0x5B);
+
+                reloc_entries.push(RelocEntry {
+                    offset: imm64_off as usize,
+                    sym_name: Some(b"_print_char".to_vec()),
                     is_call: false,
                 });
             }
@@ -1804,7 +1897,7 @@ mod tests {
         let td = tempdir().expect("tempdir");
         let pd = td.path();
         fs::create_dir_all(pd.join("src")).expect("mkdir");
-        fs::write(pd.join("src/main.sd"), "fn new main/\n    if 1 == 1/\n        println(\"yes\")/unit\n    else/\n        println(\"no\")/unit\n    fn/\n    println(\"after\")/unit\nfn/").expect("write src");
+        fs::write(pd.join("src/main.sd"), "fn new main/\n    if 1 == 1/\n        println(\"yes\")/unit\n    else/\n        println(\"no\")/unit\n    if/\n    println(\"after\")/unit\nfn/").expect("write src");
         fs::write(
             pd.join("shiden.toml"),
             r#"[project]\nname = "test"\n[build]\ntargets = ["x86_64-linux"]"#,
@@ -1822,7 +1915,7 @@ mod tests {
         let td = tempdir().expect("tempdir");
         let pd = td.path();
         fs::create_dir_all(pd.join("src")).expect("mkdir");
-        fs::write(pd.join("src/main.sd"), "fn new main/\n    let i = 0/i64\n    while i < 3/\n        println(\"{}\", i)/unit\n        i = i + 1/i64\n    fn/\n    println(\"done\")/unit\nfn/").expect("write src");
+        fs::write(pd.join("src/main.sd"), "fn new main/\n    let i = 0/i64\n    while i < 3/\n        println(\"{}\", i)/unit\n        i = i + 1/i64\n    while/\n    println(\"done\")/unit\nfn/").expect("write src");
         fs::write(
             pd.join("shiden.toml"),
             r#"[project]\nname = "test"\n[build]\ntargets = ["x86_64-linux"]"#,
@@ -2007,6 +2100,34 @@ mod tests {
         );
 
         assert!(out.status.success());
-        assert_eq!(String::from_utf8_lossy(&out.stdout), "72 105\n");
+        assert_eq!(String::from_utf8_lossy(&out.stdout), "H i\n");
+    }
+
+    #[test]
+    fn compile_assign_index() {
+        let td = tempdir().expect("tempdir");
+        let pd = td.path();
+        fs::create_dir_all(pd.join("src")).expect("mkdir");
+        fs::write(
+            pd.join("src/main.sd"),
+            "fn new main/\n    let mut a = []/array\n    push(a, 1)/unit\n    a[0] = 42/i64\n    println(\"{}\", a[0])/unit\nfn/",
+        )
+        .expect("write src");
+        fs::write(
+            pd.join("shiden.toml"),
+            r#"[project]\nname = \"test\"\n[build]\ntargets = [\"x86_64-linux\"]"#,
+        )
+        .expect("write mf");
+
+        let exe = compile_project(pd, "test", "x86_64-linux", None).expect("compile");
+        let out = run_exe(&exe).expect("run exe");
+        if !out.status.success() {
+            panic!(
+                "exe failed: {} stderr:{}",
+                out.status,
+                String::from_utf8_lossy(&out.stderr)
+            );
+        }
+        assert_eq!(String::from_utf8_lossy(&out.stdout), "42\n");
     }
 }
