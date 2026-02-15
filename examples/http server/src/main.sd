@@ -103,11 +103,12 @@ fn new send_headers_with_type(client/i64, bytes/i64, mime_type/str)/unit
 fn/
 
 fn new main/
-    println("Shiden HTTP Server listening on http://localhost:8000")/unit
+    println("Shiden HTTP Server listening on http://localhost:8001")/unit
     println("Serving files from disk using pure syscalls!")/unit
     let server = net server new(8001)/i64
     println("Server socket created with fd: {}", server)/unit
     let buffer = heap_alloc(65536)/i64
+    println("Buffer allocated at: {}", buffer)/unit
 
     while true/
         let client = net_server_accept(server)/i64
