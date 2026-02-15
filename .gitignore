@@ -1,3 +1,4 @@
 /target
 /vscode-extension/node_modules
 /scripts
+/examples/**/build/
