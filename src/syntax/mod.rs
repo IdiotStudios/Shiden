@@ -187,8 +187,7 @@ impl<'a> Lexer<'a> {
                 "char", "bool", "array", "unit", "import",
             ];
             for ty in types.iter() {
-                if rest.starts_with(ty) {
-                    let after = &rest[ty.len()..];
+                if let Some(after) = rest.strip_prefix(ty) {
                     let next_char = after.chars().next();
                     if next_char.is_none()
                         || next_char == Some('\n')
@@ -340,6 +339,7 @@ impl<'a> Lexer<'a> {
         self.next_token_with_pos()
     }
 
+    #[allow(dead_code)]
     pub fn next_token(&mut self) -> Token {
         self.next_token_with_pos().0
     }

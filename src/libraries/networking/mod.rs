@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -184,7 +185,6 @@ pub fn http_server_stop(_server_id: i64) -> Result<(), String> {
     Ok(())
 }
 
-use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
 
 pub fn tcp_server_new(port: i64) -> Result<i64, String> {
@@ -207,7 +207,7 @@ pub fn tcp_connect(host: &str, port: i64) -> Result<i64, String> {
     Ok(1)
 }
 
-pub fn tcp_send(_socket: i64, data: &str) -> Result<(), String> {
+pub fn tcp_send(_socket: i64, _data: &str) -> Result<(), String> {
     Ok(())
 }
 

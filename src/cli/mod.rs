@@ -2,12 +2,7 @@ use clap::{CommandFactory, Parser, Subcommand};
 use serde::Deserialize;
 use std::fs;
 use std::io::{self, Read};
-use std::thread;
 use std::time::{Duration, Instant};
-
-fn yellow(s: &str) -> String {
-    format!("\x1b[33m{}\x1b[0m", s)
-}
 
 fn red(s: &str) -> String {
     format!("\x1b[31m{}\x1b[0m", s)
@@ -177,7 +172,7 @@ pub fn run() {
 
                             let compile_start = Instant::now();
                             match crate::build::compile_project(
-                                &path,
+                                path,
                                 &proj_name,
                                 &target,
                                 mf.build.as_ref().and_then(|b| b.opt_level),
@@ -517,6 +512,7 @@ struct Manifest {
 }
 
 #[derive(Deserialize)]
+#[allow(dead_code)]
 struct Project {
     name: Option<String>,
     version: Option<String>,

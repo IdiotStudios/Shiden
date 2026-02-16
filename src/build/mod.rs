@@ -3,9 +3,7 @@ use object::write::{Object, StandardSection, Symbol, SymbolSection};
 use object::{Architecture, BinaryFormat, Endianness};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
-use crate::frontend;
 use crate::libraries::runtime_helpers;
 
 fn get_binary_format(target: &str) -> Result<BinaryFormat, String> {
@@ -264,10 +262,11 @@ pub fn compile_project(
         use crate::syntax::*;
         match e {
             Expr::Number(s) => s.parse::<i64>().ok(),
-            Expr::Unary { op, expr } => match op {
-                crate::syntax::UnaryOp::Neg => eval_const_integer(expr).map(|v| -v),
-                _ => None,
-            },
+            Expr::Unary {
+                op: crate::syntax::UnaryOp::Neg,
+                expr,
+            } => eval_const_integer(expr).map(|v| -v),
+            Expr::Unary { .. } => None,
             Expr::Binary { left, op, right } => {
                 let l = eval_const_integer(left)?;
                 let r = eval_const_integer(right)?;
@@ -488,7 +487,6 @@ pub fn compile_project(
                 out.push(IrInstr::Call("array_get".into(), 2));
                 Ok(())
             }
-            _ => Err(format!("unsupported expression in runtime lowering: {:?}", e).into()),
         }
     }
 
@@ -595,44 +593,67 @@ pub fn compile_project(
                     parts.push(fmt[last..].to_string());
 
                     if placeholders == 0 {
-                        return Ok(vec![IrInstr::EmitString(format!("{}\n", fmt))]);
-                    }
-                    if placeholders != args.len() - 1 {
-                        return Err("placeholder count does not match arguments".into());
-                    }
-                    let mut res: Vec<IrInstr> = Vec::new();
-                    for (i, p) in parts.iter().enumerate() {
-                        if !p.is_empty() {
-                            res.push(IrInstr::EmitString(p.clone()));
-                        }
-                        if i < placeholders {
-                            let arg_expr = &args[i + 1];
-
-                            if let Some(v) = eval_const_integer(arg_expr) {
-                                res.push(IrInstr::EmitString(format!("{}", v)));
-                                continue;
+                        Ok(vec![IrInstr::EmitString(format!("{}\n", fmt))])
+                    } else if placeholders != args.len() - 1 {
+                        Err("placeholder count does not match arguments".into())
+                    } else {
+                        let mut res: Vec<IrInstr> = Vec::new();
+                        for (i, p) in parts.iter().enumerate() {
+                            if !p.is_empty() {
+                                res.push(IrInstr::EmitString(p.clone()));
                             }
+                            if i < placeholders {
+                                let arg_expr = &args[i + 1];
 
-                            if let Expr::Char(c) = arg_expr {
-                                res.push(IrInstr::EmitString(format!("{}", c)));
-                                continue;
-                            }
+                                if let Some(v) = eval_const_integer(arg_expr) {
+                                    res.push(IrInstr::EmitString(format!("{}", v)));
+                                    continue;
+                                }
 
-                            if let Expr::StringLiteral(s) = arg_expr {
-                                res.push(IrInstr::EmitString(s.clone()));
-                                continue;
-                            }
+                                if let Expr::Char(c) = arg_expr {
+                                    res.push(IrInstr::EmitString(format!("{}", c)));
+                                    continue;
+                                }
 
-                            if let Expr::Identifier(id) = arg_expr {
-                                if matches!(types.get(id).map(String::as_str), Some("str")) {
+                                if let Expr::StringLiteral(s) = arg_expr {
+                                    res.push(IrInstr::EmitString(s.clone()));
+                                    continue;
+                                }
+
+                                if let Expr::Identifier(id) = arg_expr {
+                                    if matches!(types.get(id).map(String::as_str), Some("str")) {
+                                        lower_expr_to_ir(
+                                            arg_expr, &mut res, locals, next_local, next_label,
+                                        )?;
+                                        res.push(IrInstr::Call("__print_str".into(), 1));
+                                        res.push(IrInstr::Pop);
+                                        continue;
+                                    }
+                                    if matches!(types.get(id).map(String::as_str), Some("char")) {
+                                        lower_expr_to_ir(
+                                            arg_expr, &mut res, locals, next_local, next_label,
+                                        )?;
+                                        res.push(IrInstr::EmitChar);
+                                        continue;
+                                    }
+
                                     lower_expr_to_ir(
                                         arg_expr, &mut res, locals, next_local, next_label,
                                     )?;
-                                    res.push(IrInstr::Call("__print_str".into(), 1));
-                                    res.push(IrInstr::Pop);
+                                    res.push(IrInstr::EmitInt);
                                     continue;
                                 }
-                                if matches!(types.get(id).map(String::as_str), Some("char")) {
+
+                                if let Expr::Index {
+                                    expr: arr,
+                                    index: _,
+                                } = arg_expr
+                                    && let Expr::Identifier(base_id) = arr.as_ref()
+                                    && matches!(
+                                        types.get(base_id).map(String::as_str),
+                                        Some("array<char>")
+                                    )
+                                {
                                     lower_expr_to_ir(
                                         arg_expr, &mut res, locals, next_local, next_label,
                                     )?;
@@ -644,44 +665,21 @@ pub fn compile_project(
                                     arg_expr, &mut res, locals, next_local, next_label,
                                 )?;
                                 res.push(IrInstr::EmitInt);
-                                continue;
                             }
-
-                            if let Expr::Index {
-                                expr: arr,
-                                index: _,
-                            } = arg_expr
-                            {
-                                if let Expr::Identifier(base_id) = arr.as_ref() {
-                                    if matches!(
-                                        types.get(base_id).map(String::as_str),
-                                        Some("array<char>")
-                                    ) {
-                                        lower_expr_to_ir(
-                                            arg_expr, &mut res, locals, next_local, next_label,
-                                        )?;
-                                        res.push(IrInstr::EmitChar);
-                                        continue;
-                                    }
-                                }
-                            }
-
-                            lower_expr_to_ir(arg_expr, &mut res, locals, next_local, next_label)?;
-                            res.push(IrInstr::EmitInt);
                         }
+                        res.push(IrInstr::EmitString("\n".to_string()));
+                        Ok(res)
                     }
-                    res.push(IrInstr::EmitString("\n".to_string()));
-                    return Ok(res);
+                } else {
+                    Err("first argument to println must be a string literal format".into())
                 }
-                Err("first argument to println must be a string literal format".into())
             }
             Stmt::Expr(Expr::Call { name, args }) if name == "push" => {
-                if args.len() == 2 {
-                    if let Expr::Identifier(arr_name) = &args[0] {
-                        if let Expr::Char(_) = &args[1] {
-                            types.insert(arr_name.clone(), "array<char>".to_string());
-                        }
-                    }
+                if args.len() == 2
+                    && let Expr::Identifier(arr_name) = &args[0]
+                    && let Expr::Char(_) = &args[1]
+                {
+                    types.insert(arr_name.clone(), "array<char>".to_string());
                 }
                 let mut res = Vec::new();
                 lower_expr_to_ir(
@@ -695,7 +693,7 @@ pub fn compile_project(
                     next_label,
                 )?;
                 res.push(IrInstr::Pop);
-                return Ok(res);
+                Ok(res)
             }
 
             Stmt::Expr(expr) => {
@@ -703,7 +701,7 @@ pub fn compile_project(
                 lower_expr_to_ir(expr, &mut res, locals, next_local, next_label)?;
 
                 res.push(IrInstr::Pop);
-                return Ok(res);
+                Ok(res)
             }
             Stmt::If {
                 cond,
@@ -780,7 +778,7 @@ pub fn compile_project(
             } => {
                 let mut res = Vec::new();
 
-                let arr_local = if let Some(&i) = locals.get(var) {
+                let arr_local = if locals.get(var).is_some() {
                     let i = *next_local;
                     *next_local += 1;
                     locals.insert(format!("{}_iter", var), i);
@@ -854,7 +852,6 @@ pub fn compile_project(
                 res.push(IrInstr::Ret);
                 Ok(res)
             }
-            _ => Err(format!("unsupported statement for lowering: {:?}", stmt).into()),
         }
     }
 
@@ -864,8 +861,8 @@ pub fn compile_project(
 
     let mut func_meta: std::collections::HashMap<usize, (usize, usize)> =
         std::collections::HashMap::new();
-    let mut next_label: usize = 0;
-    let mut next_label_for_funcs = next_label;
+    let mut _next_label: usize = 0;
+    let mut next_label_for_funcs = _next_label;
     for item in prog.items.iter() {
         if let crate::syntax::Item::Function {
             name, params, body, ..
@@ -937,7 +934,7 @@ pub fn compile_project(
 
     ir.push(IrInstr::Jump(exit_label));
 
-    for (fname, _pcount, mut f_ir, _loc_count, lbl) in function_infos.drain(..) {
+    for (_fname, _pcount, mut f_ir, _loc_count, lbl) in function_infos.drain(..) {
         ir.push(IrInstr::Label(lbl));
 
         ir.append(&mut f_ir);
@@ -945,7 +942,7 @@ pub fn compile_project(
 
     ir.push(IrInstr::Label(exit_label));
 
-    next_label = next_label_for_funcs;
+    _next_label = next_label_for_funcs;
 
     fn optimize_ir(mut ir: Vec<IrInstr>, opt_level: Option<i32>) -> Vec<IrInstr> {
         if opt_level.unwrap_or(0) >= 1 {
@@ -1097,11 +1094,11 @@ pub fn compile_project(
         section: SymbolSection::Undefined,
         flags: object::SymbolFlags::None,
     };
-    let print_sym_id = obj.add_symbol(print_sym);
+    let _print_sym_id = obj.add_symbol(print_sym);
 
     let locals_count = locals.len();
 
-    let locals_id_opt: Option<object::write::SymbolId> = None;
+    let _locals_id_opt: Option<object::write::SymbolId> = None;
 
     let mut text = Vec::new();
 
@@ -1133,19 +1130,19 @@ pub fn compile_project(
     struct RelocEntry {
         offset: usize,
         sym_name: Option<Vec<u8>>,
-        is_call: bool,
+        _is_call: bool,
     }
     let mut reloc_entries: Vec<RelocEntry> = Vec::new();
 
     reloc_entries.push(RelocEntry {
         offset: argc_reloc_offset,
         sym_name: Some(b"__argc".to_vec()),
-        is_call: false,
+        _is_call: false,
     });
     reloc_entries.push(RelocEntry {
         offset: argv_reloc_offset,
         sym_name: Some(b"__argv".to_vec()),
-        is_call: false,
+        _is_call: false,
     });
 
     use byteorder::{LittleEndian, WriteBytesExt};
@@ -1162,7 +1159,7 @@ pub fn compile_project(
             IrInstr::EmitString(s) => {
                 let idx = string_iter_idx;
                 let sym_name = format!(".str.{}", idx);
-                let sym_id = obj
+                let _sym_id = obj
                     .symbol_id(sym_name.as_bytes())
                     .ok_or_else(|| format!("symbol not found {}", sym_name))?;
 
@@ -1171,8 +1168,7 @@ pub fn compile_project(
                 text.write_u64::<LittleEndian>(0).unwrap();
 
                 text.push(0xBA);
-                text.write_u32::<LittleEndian>(s.as_bytes().len() as u32)
-                    .unwrap();
+                text.write_u32::<LittleEndian>(s.len() as u32).unwrap();
 
                 text.extend_from_slice(&[0xB8, 0x01, 0x00, 0x00, 0x00]);
 
@@ -1180,9 +1176,9 @@ pub fn compile_project(
 
                 text.extend_from_slice(&[0x0F, 0x05]);
                 reloc_entries.push(RelocEntry {
-                    offset: imm64_off as usize,
+                    offset: imm64_off,
                     sym_name: Some(sym_name.into_bytes()),
-                    is_call: false,
+                    _is_call: false,
                 });
                 string_iter_idx += 1;
             }
@@ -1234,9 +1230,9 @@ pub fn compile_project(
                 text.push(0x5B);
 
                 reloc_entries.push(RelocEntry {
-                    offset: imm64_off as usize,
+                    offset: imm64_off,
                     sym_name: Some(b"_print_i64".to_vec()),
-                    is_call: false,
+                    _is_call: false,
                 });
             }
             IrInstr::EmitChar => {
@@ -1267,9 +1263,9 @@ pub fn compile_project(
                 text.push(0x5B);
 
                 reloc_entries.push(RelocEntry {
-                    offset: imm64_off as usize,
+                    offset: imm64_off,
                     sym_name: Some(b"_print_char".to_vec()),
-                    is_call: false,
+                    _is_call: false,
                 });
             }
             IrInstr::Pop => {
@@ -1349,18 +1345,21 @@ pub fn compile_project(
                     }
 
                     let reg_codes: [u8; 6] = [7, 6, 2, 1, 8, 9];
-                    for i in 0..(*param_count) {
+
+                    for (i, &reg) in reg_codes.iter().enumerate().take(*param_count) {
                         let local_offset = 8 + (i as i32 * 8);
-                        if i < 6 {
-                            let reg = reg_codes[i];
-                            let reg_low = reg & 0x7;
-                            let modrm = 0x80 | (reg_low << 3) | 0x05;
-                            let rex: u8 = 0x48 | if reg >= 8 { 0x04 } else { 0x00 };
-                            text.push(rex);
-                            text.push(0x89);
-                            text.push(modrm);
-                            text.write_i32::<LittleEndian>(-local_offset).unwrap();
-                        } else {
+                        let reg_low = reg & 0x7;
+                        let modrm = 0x80 | (reg_low << 3) | 0x05;
+                        let rex: u8 = 0x48 | if reg >= 8 { 0x04 } else { 0x00 };
+                        text.push(rex);
+                        text.push(0x89);
+                        text.push(modrm);
+                        text.write_i32::<LittleEndian>(-local_offset).unwrap();
+                    }
+
+                    if *param_count > 6 {
+                        for i in 6..*param_count {
+                            let local_offset = 8 + (i as i32 * 8);
                             text.extend_from_slice(&[0x48, 0x8B, 0x85]);
                             let src_disp = 16 + ((i - 6) as i32 * 8);
                             text.write_i32::<LittleEndian>(src_disp).unwrap();
@@ -1373,7 +1372,7 @@ pub fn compile_project(
             }
             IrInstr::Call(name, nargs) => {
                 let num_reg = if nargs > 6 { 6 } else { nargs };
-                let stack_count = if nargs > 6 { nargs - 6 } else { 0 };
+                let stack_count = nargs.saturating_sub(6);
                 let use_pop_args = nargs <= 6;
                 let mut scratch_alloc: i32 = 0;
 
@@ -1397,7 +1396,7 @@ pub fn compile_project(
 
                         use byteorder::WriteBytesExt as _;
 
-                        scratch_alloc = (nargs as i32 * 8) + pad as i32;
+                        scratch_alloc = (nargs as i32 * 8) + pad;
                         if scratch_alloc > 0 {
                             text.extend_from_slice(&[0x48, 0x81, 0xEC]);
                             text.write_i32::<LittleEndian>(scratch_alloc).unwrap();
@@ -1410,13 +1409,13 @@ pub fn compile_project(
                             text.extend_from_slice(&[0x48, 0x8B, 0x84, 0x24]);
                             text.write_i32::<LittleEndian>(from_off).unwrap();
 
-                            let dest = (pad as i32) + (k as i32 * 8);
+                            let dest = pad + (k as i32 * 8);
                             text.extend_from_slice(&[0x48, 0x89, 0x84, 0x24]);
                             text.write_i32::<LittleEndian>(dest).unwrap();
                         }
 
                         for i in 0..num_reg {
-                            let src_off = (pad as i32) + (i as i32 * 8);
+                            let src_off = pad + (i as i32 * 8);
 
                             text.extend_from_slice(&[0x48, 0x8B, 0x84, 0x24]);
                             text.write_i32::<LittleEndian>(src_off).unwrap();
@@ -1434,7 +1433,7 @@ pub fn compile_project(
 
                         text.extend_from_slice(&[0x4C, 0x8B, 0xDC]);
                         for j in (num_reg..nargs).rev() {
-                            let src_off = (pad as i32) + (j as i32 * 8);
+                            let src_off = pad + (j as i32 * 8);
 
                             text.extend_from_slice(&[0x49, 0x8B, 0x83]);
                             text.write_i32::<LittleEndian>(src_off).unwrap();
@@ -1456,7 +1455,7 @@ pub fn compile_project(
 
                     text.extend_from_slice(&[0xFF, 0xD0]);
 
-                    let sym_id = if let Some(sid) = obj.symbol_id(name.as_bytes()) {
+                    let _sym_id = if let Some(sid) = obj.symbol_id(name.as_bytes()) {
                         sid
                     } else {
                         let sym = Symbol {
@@ -1472,16 +1471,16 @@ pub fn compile_project(
                         obj.add_symbol(sym)
                     };
                     reloc_entries.push(RelocEntry {
-                        offset: imm64_off as usize,
+                        offset: imm64_off,
                         sym_name: Some(name.as_bytes().to_vec()),
-                        is_call: false,
+                        _is_call: false,
                     });
                 }
 
                 if !use_pop_args {
                     if stack_count > 0 {
                         text.extend_from_slice(&[0x48, 0x81, 0xC4]);
-                        text.write_i32::<LittleEndian>((stack_count as i32 * 8))
+                        text.write_i32::<LittleEndian>(stack_count as i32 * 8)
                             .unwrap();
                     }
 
@@ -1492,7 +1491,7 @@ pub fn compile_project(
 
                     if nargs > 0 {
                         text.extend_from_slice(&[0x48, 0x81, 0xC4]);
-                        text.write_i32::<LittleEndian>((nargs as i32 * 8)).unwrap();
+                        text.write_i32::<LittleEndian>(nargs as i32 * 8).unwrap();
                     }
                 }
 
@@ -1579,24 +1578,24 @@ pub fn compile_project(
             reloc_entries.push(RelocEntry {
                 offset: pos + 16,
                 sym_name: Some(b"array_new".to_vec()),
-                is_call: false,
+                _is_call: false,
             });
             reloc_entries.push(RelocEntry {
                 offset: pos + 46,
                 sym_name: Some(b"push".to_vec()),
-                is_call: false,
+                _is_call: false,
             });
         }
         if *name == "__print_str" {
             reloc_entries.push(RelocEntry {
                 offset: pos + 21,
                 sym_name: Some(b"len".to_vec()),
-                is_call: false,
+                _is_call: false,
             });
             reloc_entries.push(RelocEntry {
                 offset: pos + 50,
                 sym_name: Some(b"array_get".to_vec()),
-                is_call: false,
+                _is_call: false,
             });
         }
 
@@ -1604,28 +1603,28 @@ pub fn compile_project(
             reloc_entries.push(RelocEntry {
                 offset: pos + 2,
                 sym_name: Some(b"__argc".to_vec()),
-                is_call: false,
+                _is_call: false,
             });
             reloc_entries.push(RelocEntry {
                 offset: pos + 15,
                 sym_name: Some(b"__argv".to_vec()),
-                is_call: false,
+                _is_call: false,
             });
 
             reloc_entries.push(RelocEntry {
                 offset: pos + 41,
                 sym_name: Some(b"array_new".to_vec()),
-                is_call: false,
+                _is_call: false,
             });
             reloc_entries.push(RelocEntry {
                 offset: pos + 71,
                 sym_name: Some(b"__cstr_to_string".to_vec()),
-                is_call: false,
+                _is_call: false,
             });
             reloc_entries.push(RelocEntry {
                 offset: pos + 89,
                 sym_name: Some(b"push".to_vec()),
-                is_call: false,
+                _is_call: false,
             });
         }
     }
@@ -1641,8 +1640,8 @@ pub fn compile_project(
         let sym = String::from_utf8_lossy(sym_name).into_owned();
         let sym_pos_opt = if let Some(p) = helper_pos.get(sym.as_str()) {
             Some(*p)
-        } else if sym.starts_with(".str.") {
-            if let Ok(idx) = sym[5..].parse::<usize>() {
+        } else if let Some(stripped) = sym.strip_prefix(".str.") {
+            if let Ok(idx) = stripped.parse::<usize>() {
                 if idx < string_positions.len() {
                     Some(text.len() + string_positions[idx])
                 } else {
@@ -1665,19 +1664,17 @@ pub fn compile_project(
         let pos = sym_pos_opt.ok_or_else(|| format!("undefined symbol in relocation: {}", sym))?;
         let addr = base_vaddr + (file_text_off as u64) + (pos as u64);
         let off = r.offset;
-        let mut le = (addr).to_le_bytes();
+        let le = (addr).to_le_bytes();
         if off + 8 > text.len() {
             return Err(format!(
                 "relocation offset out of range: {} > {}",
                 off + 8,
                 text.len()
-            )
-            .into());
+            ));
         }
         text[off..off + 8].copy_from_slice(&le);
     }
 
-    use std::io::Write as _;
     fn write_u16(buf: &mut Vec<u8>, v: u16) {
         buf.extend_from_slice(&v.to_le_bytes());
     }
