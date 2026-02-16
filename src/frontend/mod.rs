@@ -991,7 +991,7 @@ mod tests {
                         ty,
                     } => {
                         assert_eq!(name, "age");
-                        assert_eq!(*mutable, false);
+                        assert!(!(*mutable));
                         assert_eq!(ty.as_ref().map(|s| s.as_str()), Some("u8"));
                         match value {
                             Expr::Number(n) => assert_eq!(n, "20"),
