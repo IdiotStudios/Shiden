@@ -1,4 +1,5 @@
 /target
-/vscode-extension/node_modules
 /scripts
 /examples/**/build/
+# Decided not to release it
+/slack-bot
