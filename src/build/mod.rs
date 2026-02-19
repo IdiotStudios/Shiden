@@ -7,8 +7,31 @@ use std::path::{Path, PathBuf};
 use crate::libraries::runtime_helpers;
 
 mod linux;
+mod windows;
 use linux::RelocEntry;
-use linux::{get_binary_format, get_executable_extension};
+
+fn get_binary_format(target: &str) -> Result<object::BinaryFormat, String> {
+    if target.contains("windows") {
+        Ok(object::BinaryFormat::Pe)
+    } else if target.contains("linux") {
+        Ok(object::BinaryFormat::Elf)
+    } else if target.contains("macos") {
+        Ok(object::BinaryFormat::MachO)
+    } else {
+        Err(format!(
+            "Unsupported target: {}, contact us if you want support",
+            target
+        ))
+    }
+}
+
+fn get_executable_extension(target: &str) -> &'static str {
+    if target.contains("windows") {
+        ".exe"
+    } else {
+        ""
+    }
+}
 
 fn resolve_imports(proj_dir: &Path, prog: &mut crate::syntax::Program) -> Result<(), String> {
     let mut imports = Vec::new();
@@ -1005,7 +1028,16 @@ pub fn compile_project(
         }
     }
 
-    let mut obj = Object::new(binary_format, Architecture::X86_64, Endianness::Little);
+    let obj_format_for_writer = if target.contains("windows") {
+        object::BinaryFormat::Elf
+    } else {
+        binary_format
+    };
+    let mut obj = Object::new(
+        obj_format_for_writer,
+        Architecture::X86_64,
+        Endianness::Little,
+    );
 
     let text_id = obj.section_id(StandardSection::Text);
     let data_id = obj.section_id(StandardSection::Data);
@@ -1536,11 +1568,14 @@ pub fn compile_project(
     std::fs::create_dir_all(&out_dir)
         .map_err(|e| format!("Failed to create output dir {}: {}", out_dir.display(), e))?;
     let obj_path = out_dir.join(format!("{}.o", proj_name));
-    let obj_bytes = obj
-        .write()
-        .map_err(|e| format!("object write error: {}", e))?;
-    std::fs::write(&obj_path, &obj_bytes)
-        .map_err(|e| format!("Failed to write object file: {}", e))?;
+
+    if !target.contains("windows") {
+        let obj_bytes = obj
+            .write()
+            .map_err(|e| format!("object write error: {}", e))?;
+        std::fs::write(&obj_path, &obj_bytes)
+            .map_err(|e| format!("Failed to write object file: {}", e))?;
+    }
 
     let helpers: std::collections::BTreeMap<&str, Vec<u8>> = runtime_helpers::get_helpers();
 
@@ -1605,20 +1640,37 @@ pub fn compile_project(
         }
     }
 
-    let exe_path = linux::write_executable_from_sections(
-        &out_dir,
-        proj_name,
-        target,
-        &mut text,
-        &rodata,
-        &string_positions,
-        &helper_pos,
-        &reloc_entries,
-        &func_label_map,
-        &label_positions,
-        argc_ro_offset,
-        argv_ro_offset,
-    )?;
+    let exe_path = if target.contains("windows") {
+        windows::write_executable_from_sections(
+            &out_dir,
+            proj_name,
+            target,
+            &mut text,
+            &rodata,
+            &string_positions,
+            &helper_pos,
+            &reloc_entries,
+            &func_label_map,
+            &label_positions,
+            argc_ro_offset,
+            argv_ro_offset,
+        )?
+    } else {
+        linux::write_executable_from_sections(
+            &out_dir,
+            proj_name,
+            target,
+            &mut text,
+            &rodata,
+            &string_positions,
+            &helper_pos,
+            &reloc_entries,
+            &func_label_map,
+            &label_positions,
+            argc_ro_offset,
+            argv_ro_offset,
+        )?
+    };
 
     Ok(exe_path)
 }

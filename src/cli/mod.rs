@@ -388,23 +388,17 @@ pub fn run() {
                         .project
                         .and_then(|p| p.name)
                         .unwrap_or_else(|| "unnamed".to_string());
-                    let targets = mf
+                    let mut targets = mf
                         .build
                         .as_ref()
                         .and_then(|b| b.targets.clone())
                         .unwrap_or_default();
-                    let linux: Vec<_> = targets
-                        .into_iter()
-                        .filter(|t| t.contains("linux"))
-                        .collect();
-                    if linux.is_empty() {
-                        eprintln!(
-                            "No linux targets found in manifest; only linux is supported for now."
-                        );
-                        std::process::exit(2);
+
+                    if targets.is_empty() {
+                        targets.push(get_current_platform_target().to_string());
                     }
 
-                    for t in linux {
+                    for t in targets {
                         eprintln!("Compiling for {} ...", t);
 
                         let outdir = proj_dir.join("build").join(&t);
@@ -420,7 +414,7 @@ pub fn run() {
                         ) {
                             Ok(p) => println!("Built {} for {} -> {}", proj_name, t, p.display()),
                             Err(e) => {
-                                eprintln!("Build failed: {}", e);
+                                eprintln!("Build failed for {}: {}", t, e);
                                 std::process::exit(2);
                             }
                         }
@@ -606,18 +600,58 @@ mod tests {
     }
 
     #[test]
-    fn manifest_parsing_filters_linux() {
+    fn manifest_parsing_reads_targets() {
         let s = r#"[project]
 name = "test"
 [build]
 targets = ["x86_64-linux", "x86_64-windows"]"#;
         let m: Manifest = toml::from_str(s).expect("parse manifest");
         let targets = m.build.unwrap().targets.unwrap();
-        let linux: Vec<_> = targets
-            .into_iter()
-            .filter(|t| t.contains("linux"))
-            .collect();
-        assert_eq!(linux, vec!["x86_64-linux".to_string()]);
+        assert_eq!(
+            targets,
+            vec!["x86_64-linux".to_string(), "x86_64-windows".to_string()]
+        );
+    }
+
+    #[test]
+    fn compile_command_builds_all_manifest_targets() {
+        use tempfile::tempdir;
+        let td = tempdir().expect("tempdir");
+        let pd = td.path();
+
+        std::fs::create_dir_all(pd.join("src")).expect("create src");
+        std::fs::write(
+            pd.join("src/main.sd"),
+            "fn new main/\n    println(\"hi\")/unit\nfn/",
+        )
+        .expect("write main");
+
+        std::fs::write(
+            pd.join("shiden.toml"),
+            r#"[project]
+name = "multi"
+[build]
+targets = ["x86_64-linux", "x86_64-windows"]"#,
+        )
+        .expect("write manifest");
+
+        let mf = load_manifest_from_path(&pd.join("shiden.toml")).expect("load manifest");
+        let proj_name = mf
+            .project
+            .and_then(|p| p.name)
+            .unwrap_or_else(|| "multi".into());
+        let targets = mf.build.unwrap().targets.unwrap();
+
+        for t in targets {
+            let exe = crate::build::compile_project(pd, &proj_name, &t, None)
+                .expect(&format!("compile target {}", t));
+            assert!(
+                exe.exists(),
+                "executable for {} not found: {}",
+                t,
+                exe.display()
+            );
+        }
     }
 
     #[test]

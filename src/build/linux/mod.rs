@@ -1,29 +1,5 @@
-use object::BinaryFormat;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-
-pub(super) fn get_binary_format(target: &str) -> Result<BinaryFormat, String> {
-    if target.contains("windows") {
-        Ok(BinaryFormat::Pe)
-    } else if target.contains("linux") {
-        Ok(BinaryFormat::Elf)
-    } else if target.contains("macos") {
-        Ok(BinaryFormat::MachO)
-    } else {
-        Err(format!(
-            "Unsupported target: {}, contact us if you want support",
-            target
-        ))
-    }
-}
-
-pub(super) fn get_executable_extension(target: &str) -> &'static str {
-    if target.contains("windows") {
-        ".exe"
-    } else {
-        ""
-    }
-}
 
 pub struct RelocEntry {
     pub offset: usize,
@@ -151,7 +127,7 @@ pub fn write_executable_from_sections(
     file_bytes.extend_from_slice(&text);
     file_bytes.extend_from_slice(&rodata);
 
-    let exe_name = format!("{}{}", proj_name, get_executable_extension(target));
+    let exe_name = format!("{}{}", proj_name, super::get_executable_extension(target));
     let exe_path = out_dir.join(&exe_name);
     {
         use std::io::Write;
