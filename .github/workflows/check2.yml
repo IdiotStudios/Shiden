@@ -53,7 +53,7 @@ jobs:
         run: cargo run -- run examples/brainfuck
 
       - name: Run Shiden Hello World example
-        run: cargo run -- run examples/hello\ world
+        run: cargo run -- run examples/HelloWorld
 
       # Soon
       #- name: Run Shiden Fibonacci example
