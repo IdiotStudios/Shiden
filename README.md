@@ -14,7 +14,6 @@ Shiden-Package-Registry: (hint...)
 
 ## Todo
 
-- Static Translation Layer (STL) for cross-platform compatibility
 - Improved error messages with code snippets and suggestions
 - Support for more platforms (Windows, macOS)
 - Built-in libraries for common tasks (networking, filesystem, etc.)
