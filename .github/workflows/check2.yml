@@ -17,7 +17,10 @@ permissions:
 
 jobs:
   shiden:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
     environment:
       name: check-shiden
     permissions:
@@ -48,7 +51,15 @@ jobs:
 
       - name: Run Shiden Brainfuck interpreter
         run: cargo run -- run examples/brainfuck
+
+      - name: Run Shiden Hello World example
+        run: cargo run -- run examples/hello\ world
+
+      # Soon
+      #- name: Run Shiden Fibonacci example
+      #  run: cargo run -- run examples/fibonacci
       
       - name: Run Shiden HTTP server (with timeout)
+        if: matrix.os == 'ubuntu-latest'
         timeout-minutes: 1
         run: timeout 5s cargo run -- run examples/http\ server || [ $? -eq 124 ]
