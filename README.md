@@ -1,12 +1,5 @@
 # Shiden
 
-[![Build]][build_url]  
-[![Version]][tag_url]  
-[![Size]][tag_url]  
-[![Pulls]][hub_url]  
-[![Stars]][hub_url]  
-[![License]][license_url]  
-
 Shiden is a high-performance, ahead-of-time compiled programming language built for speed, predictability, and low-level control while retaining a familiar, Rust like syntax. (❤️ [Rust](https://github.com/rust-lang/rust))
 
 Shiden has a .sd file format
