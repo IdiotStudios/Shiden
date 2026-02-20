@@ -202,6 +202,30 @@ mod tests {
     }
 
     #[test]
+    fn compile_linux_network_helpers() {
+        let td = tempdir().expect("tempdir");
+        let pd = td.path();
+        fs::create_dir_all(pd.join("src")).expect("mkdir");
+        fs::write(
+            pd.join("src/main.sd"),
+            "fn new main/\n    let s = net server new(8080)/i64\n    let _ = net_close(s)/i64\nfn/",
+        )
+        .expect("write src");
+        fs::write(
+            pd.join("shiden.toml"),
+            r#"[project]\nname = "test"\n[build]\ntargets = ["x86_64-linux"]"#,
+        )
+        .expect("write mf");
+
+        let exe = compile_project(pd, "test", "x86_64-linux", None).expect("compile");
+        let data = std::fs::read(&exe).expect("read exe");
+
+        let helpers = crate::libraries::runtime_helpers::get_helpers("x86_64-linux");
+        let net_h = helpers.get("net_server_new").expect("missing net helper");
+        assert!(data.windows(net_h.len()).any(|w| w == net_h.as_slice()));
+    }
+
+    #[test]
     fn compile_println_with_placeholder_and_expr() {
         let td = tempdir().expect("tempdir");
         let pd = td.path();

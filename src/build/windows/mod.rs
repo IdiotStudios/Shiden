@@ -485,6 +485,36 @@ mod tests {
 
         assert!(data.windows(helper.len()).any(|w| w == helper.as_slice()));
     }
+
+    #[test]
+    fn compile_windows_network_helpers_on_unix() {
+        let td = tempdir().expect("tempdir");
+        let pd = td.path();
+        fs::create_dir_all(pd.join("src")).expect("mkdir");
+        fs::write(
+            pd.join("src/main.sd"),
+            "fn new main/\n    let s = net server new(8000)/i64\n    let _ = net_close(s)/i64\nfn/",
+        )
+        .expect("write src");
+        fs::write(
+            pd.join("shiden.toml"),
+            r#"[project]\nname = "test"\n[build]\ntargets = ["x86_64-windows"]"#,
+        )
+        .expect("write mf");
+
+        let exe = compile_project(pd, "test", "x86_64-windows", None).expect("compile");
+
+        let data = std::fs::read(&exe).expect("read exe");
+
+        let helpers = runtime_helpers::get_helpers("x86_64-windows");
+        let net_helper = helpers
+            .get("net_server_new")
+            .expect("network helper missing");
+        assert!(
+            data.windows(net_helper.len())
+                .any(|w| w == net_helper.as_slice())
+        );
+    }
 }
 
 #[cfg(test)]
