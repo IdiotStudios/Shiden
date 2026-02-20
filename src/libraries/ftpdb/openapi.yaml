@@ -1,0 +1,465 @@
+openapi: 3.0.3
+info:
+  title: FTPDB Public API
+  description: "OpenAPI spec for the FTPDB public JSON API endpoints under /api. Returns project, user, and devlog data sorted by various metrics."
+  version: "1.0.0"
+servers:
+  - url: /api
+
+paths:
+  /hot:
+    get:
+      summary: "Hot projects"
+      description: "Returns the top 10 hottest projects sorted by hot_score (trending activity) in descending order."
+      tags:
+        - Projects
+      responses:
+        '200':
+          description: Success - Returns a map of hot projects keyed by project ID
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  $ref: '#/components/schemas/ProjectWithUser'
+              example:
+                "123": 
+                  id: "123"
+                  title: "Awesome Game"
+                  banner_url: "https://..."
+                  total_hours: 240
+                  user_id: "user-1"
+                  display_name: "devuser"
+                  avatar_url: "https://..."
+                  slack_id: "U12345"
+
+  /top_this_week:
+    get:
+      summary: "Top projects this week"
+      description: "Returns the top 10 projects of the current week sorted by weekly rank."
+      tags:
+        - Projects
+      responses:
+        '200':
+          description: Success - Returns an array of top projects this week
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProjectWithUserAndRank'
+              example:
+                - id: "123"
+                  title: "Game Mechanics"
+                  rank: 1
+                  banner_url: "https://..."
+                  user_id: "user-1"
+                  display_name: "devuser"
+                  avatar_url: "https://..."
+                  total_hours: 120
+                  slack_id: "U12345"
+
+  /fan_favourites:
+    get:
+      summary: "Fan favourite projects"
+      description: "Returns the top 10 fan favourite projects sorted by total likes in descending order."
+      tags:
+        - Projects
+      responses:
+        '200':
+          description: Success - Returns a map of fan favourite projects keyed by project ID
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  $ref: '#/components/schemas/ProjectWithUser'
+              example:
+                "123":
+                  id: "123"
+                  title: "Popular Project"
+                  banner_url: "https://..."
+                  user_id: "user-1"
+                  display_name: "devuser"
+                  avatar_url: "https://..."
+                  total_hours: 180
+                  slack_id: "U12345"
+
+  /top_all_time:
+    get:
+      summary: "Top projects of all time"
+      description: "Returns the top 10 all-time projects sorted by all-time rank."
+      tags:
+        - Projects
+      responses:
+        '200':
+          description: Success - Returns an array of all-time top projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProjectWithUserAndRank'
+              example:
+                - id: "456"
+                  title: "Classic Project"
+                  rank: 1
+                  banner_url: "https://..."
+                  user_id: "user-2"
+                  display_name: "legendary_dev"
+                  avatar_url: "https://..."
+                  total_hours: 500
+                  slack_id: "U67890"
+
+  /most_time_spent:
+    get:
+      summary: "Users with most time spent"
+      description: "Returns the top 10 users sorted by total time spent contributing."
+      tags:
+        - Users
+      responses:
+        '200':
+          description: Success - Returns an array of top contributors by time spent
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+              example:
+                - id: "user-1"
+                  display_name: "prolific_dev"
+                  avatar_url: "https://..."
+                  total_hours: 1200
+
+  /random_projects:
+    get:
+      summary: "Random projects"
+      description: "Returns a random selection of projects. Optionally filter by stat type to delegate to other endpoints."
+      tags:
+        - Projects
+      parameters:
+        - in: query
+          name: filter
+          required: false
+          schema:
+            type: string
+            enum: [stat_hot_score, stat_total_likes, stat_total_duration_seconds]
+          description: |
+            Optional filter parameter:
+            - `stat_hot_score` delegates to /hot
+            - `stat_total_likes` delegates to /fan_favourites
+            - `stat_total_duration_seconds` delegates to /most_time_spent
+            - Omit for truly random selection
+      responses:
+        '200':
+          description: Success - Returns an array of random projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProjectWithStats'
+
+  /random_devlogs:
+    get:
+      summary: "Random devlogs"
+      description: "Returns up to 10 random devlogs weighted towards recent updates. Devlogs are selected with exponential bias towards newer entries."
+      tags:
+        - Devlogs
+      responses:
+        '200':
+          description: Success - Returns an array of random devlogs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DevlogWithProject'
+
+  /devlogs/{id}:
+    get:
+      summary: "Get devlogs for a project"
+      description: "Returns all devlogs for a specific project, sorted by creation date (newest first)."
+      tags:
+        - Devlogs
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Project ID
+      responses:
+        '200':
+          description: Success - Returns an array of devlogs for the project
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Devlog'
+        '404':
+          description: Project not found or has no devlogs
+
+  /project_info/{id}:
+    get:
+      summary: "Get detailed project information"
+      description: "Returns comprehensive information about a specific project including description, links, and statistics."
+      tags:
+        - Projects
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Project ID
+      responses:
+        '200':
+          description: Success - Returns detailed project information
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProjectFull'
+        '404':
+          description: Project not found
+
+  /user_info/{id}:
+    get:
+      summary: "Get user information"
+      description: "Returns profile information for a specific user."
+      tags:
+        - Users
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: User ID
+      responses:
+        '200':
+          description: Success - Returns user information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserWithTime'
+        '404':
+          description: User not found
+
+  /user_projects/{user_id}:
+    get:
+      summary: "Get projects for a user"
+      description: "Returns all projects created by a specific user, sorted by total time spent in descending order."
+      tags:
+        - Users
+      parameters:
+        - in: path
+          name: user_id
+          required: true
+          schema:
+            type: string
+          description: User ID
+      responses:
+        '200':
+          description: Success - Returns an array of user's projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProjectBasic'
+        '404':
+          description: User not found or has no projects
+
+components:
+  schemas:
+    ProjectBasic:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique project identifier
+        title:
+          type: string
+          description: Project title
+        banner_url:
+          type: string
+          nullable: true
+          description: URL to project banner/thumbnail image
+        total_hours:
+          type: integer
+          description: Total development time in hours
+        total_likes:
+          type: integer
+          description: Total community likes/votes
+      required:
+        - id
+        - title
+      example:
+        id: "proj-123"
+        title: "Cool Game Prototype"
+        banner_url: "https://example.com/banner.jpg"
+        total_hours: 120
+        total_likes: 45
+
+    ProjectWithUser:
+      allOf:
+        - $ref: '#/components/schemas/ProjectBasic'
+        - type: object
+          properties:
+            user_id:
+              type: string
+              description: ID of the project creator
+            display_name:
+              type: string
+              description: Creator's display name
+            avatar_url:
+              type: string
+              nullable: true
+              description: Creator's avatar image URL
+            slack_id:
+              type: string
+              nullable: true
+              description: Creator's Slack user ID
+          required:
+            - user_id
+            - display_name
+
+    ProjectWithUserAndRank:
+      allOf:
+        - $ref: '#/components/schemas/ProjectWithUser'
+        - type: object
+          properties:
+            rank:
+              type: integer
+              description: Ranking position (weekly or all-time)
+
+    ProjectWithStats:
+      allOf:
+        - $ref: '#/components/schemas/ProjectWithUser'
+        - type: object
+          properties:
+            hot_score:
+              type: number
+              description: Hot score metric (trending activity)
+            likes:
+              type: integer
+              description: Total likes (alternative field name)
+
+    ProjectFull:
+      allOf:
+        - $ref: '#/components/schemas/ProjectWithUser'
+        - type: object
+          properties:
+            description:
+              type: string
+              nullable: true
+              description: Full project description
+            repo_url:
+              type: string
+              nullable: true
+              description: Repository URL
+            demo_url:
+              type: string
+              nullable: true
+              description: Live demo URL
+            ship_status:
+              type: string
+              nullable: true
+              description: Project status (e.g., "shipped", "in-progress", "idea")
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique user identifier
+        display_name:
+          type: string
+          description: User's display name
+        avatar_url:
+          type: string
+          nullable: true
+          description: User's avatar image URL
+        total_hours:
+          type: integer
+          description: Total time contributed in hours
+      required:
+        - id
+        - display_name
+      example:
+        id: "user-123"
+        display_name: "awesome_dev"
+        avatar_url: "https://example.com/avatar.jpg"
+        total_hours: 450
+
+    UserWithTime:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            slack_id:
+              type: string
+              nullable: true
+              description: User's Slack ID
+
+    Devlog:
+      type: object
+      properties:
+        body:
+          type: string
+          description: Devlog content/description
+        total_hours:
+          type: integer
+          description: Time spent in this devlog session, in hours
+        comments_count:
+          type: integer
+          description: Number of comments on this devlog
+        created_at:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of devlog creation
+        media_urls:
+          type: array
+          items:
+            type: string
+          description: Array of media file URLs (images, videos, etc.)
+      required:
+        - body
+        - total_hours
+        - created_at
+      example:
+        body: "Implemented player movement and collision detection"
+        total_hours: 4
+        comments_count: 12
+        created_at: "2024-02-15T10:30:00Z"
+        media_urls: ["https://example.com/screenshot.png"]
+
+    DevlogWithProject:
+      allOf:
+        - $ref: '#/components/schemas/Devlog'
+        - type: object
+          properties:
+            id:
+              type: string
+              description: Devlog ID
+            project_id:
+              type: string
+              description: Associated project ID
+            project_title:
+              type: string
+              description: Associated project title
+            user_id:
+              type: string
+              description: Creator user ID
+            user_display_name:
+              type: string
+              description: Creator's display name
+            user_avatar:
+              type: string
+              nullable: true
+              description: Creator's avatar URL
