@@ -191,6 +191,7 @@ impl<'a> Lexer<'a> {
                     let next_char = after.chars().next();
                     if next_char.is_none()
                         || next_char == Some('\n')
+                        || next_char == Some('\r')
                         || next_char == Some(' ')
                         || next_char == Some('\t')
                         || next_char == Some(',')
@@ -207,7 +208,7 @@ impl<'a> Lexer<'a> {
             let mut next_non_ws: Option<char> = None;
             while i < self.src.len() {
                 let c = self.src[i..].chars().next().unwrap();
-                if c == ' ' || c == '\t' {
+                if c == ' ' || c == '\t' || c == '\r' {
                     i += c.len_utf8();
                     continue;
                 }

@@ -52,8 +52,11 @@ pub fn write_executable_from_sections(
             None
         };
 
-        let pos_in_text =
-            sym_pos_opt.ok_or_else(|| format!("undefined symbol in relocation: {}", sym))?;
+        let pos_in_text_opt = sym_pos_opt;
+        if pos_in_text_opt.is_none() {
+            continue;
+        }
+        let pos_in_text = pos_in_text_opt.unwrap();
 
         let off = r.offset;
         if off + 8 > text.len() {
@@ -72,8 +75,66 @@ pub fn write_executable_from_sections(
         ((v + a - 1) / a) * a
     }
 
+    let mut import_funcs: Vec<String> = Vec::new();
+    for r in reloc_entries.iter() {
+        if let Some(sym_name) = &r.sym_name {
+            let s = String::from_utf8_lossy(sym_name).into_owned();
+
+            if !helper_pos.contains_key(s.as_str())
+                && !s.starts_with(".str.")
+                && s != "__argc"
+                && s != "__argv"
+                && s != "_start"
+                && !func_label_map.contains_key(&s)
+            {
+                if !import_funcs.contains(&s) {
+                    import_funcs.push(s);
+                }
+            }
+        }
+    }
+
+    let mut import_data: Vec<u8> = Vec::new();
+    let mut import_by_name_offsets: Vec<u32> = Vec::new();
+
+    if !import_funcs.is_empty() {
+        let dll_name = b"kernel32.dll\0";
+
+        let ilt_offset_in_block = import_data.len();
+        for _ in &import_funcs {
+            import_data.extend_from_slice(&0u64.to_le_bytes());
+        }
+        import_data.extend_from_slice(&0u64.to_le_bytes());
+
+        let iat_offset_in_block = import_data.len();
+        for _ in &import_funcs {
+            import_data.extend_from_slice(&0u64.to_le_bytes());
+        }
+        import_data.extend_from_slice(&0u64.to_le_bytes());
+
+        for f in &import_funcs {
+            let name_rva_in_block = import_data.len() as u32;
+            import_data.extend_from_slice(&0u16.to_le_bytes());
+            import_data.extend_from_slice(f.as_bytes());
+            import_data.push(0);
+            import_by_name_offsets.push(name_rva_in_block);
+        }
+
+        let dll_name_rva_in_block = import_data.len() as u32;
+        import_data.extend_from_slice(dll_name);
+
+        let import_descriptor_offset = import_data.len();
+        import_data.extend_from_slice(&0u32.to_le_bytes());
+        import_data.extend_from_slice(&0u32.to_le_bytes());
+        import_data.extend_from_slice(&0u32.to_le_bytes());
+        import_data.extend_from_slice(&0u32.to_le_bytes());
+        import_data.extend_from_slice(&0u32.to_le_bytes());
+
+        import_data.extend_from_slice(&[0u8; 20]);
+    }
+
     let text_vsize = text.len() as u64;
-    let rdata_vsize = rodata.len() as u64;
+    let rdata_vsize = (rodata.len() + import_data.len()) as u64;
 
     let text_raw_size = align_up(text_vsize, FILE_ALIGNMENT as u64) as u32;
     let rdata_raw_size = align_up(rdata_vsize, FILE_ALIGNMENT as u64) as u32;
@@ -89,16 +150,54 @@ pub fn write_executable_from_sections(
 
     for r in reloc_entries.iter() {
         let off = r.offset;
-        let stored = u64::from_le_bytes(text[off..off + 8].try_into().unwrap());
+        let sym_name = r
+            .sym_name
+            .as_ref()
+            .map(|s| String::from_utf8_lossy(s).into_owned());
 
-        let final_va: u64 = if stored < (text.len() as u64) {
-            IMAGE_BASE + text_rva + stored
-        } else {
-            let ro_off = stored - (text.len() as u64);
-            IMAGE_BASE + rdata_rva + ro_off
-        };
-        let le = final_va.to_le_bytes();
-        text[off..off + 8].copy_from_slice(&le);
+        if let Some(sym) = sym_name {
+            if let Some(p) = helper_pos.get(sym.as_str()) {
+                let pos_in_text = *p as u64;
+                let le = pos_in_text.to_le_bytes();
+                text[off..off + 8].copy_from_slice(&le);
+                continue;
+            }
+            if let Some(stripped) = sym.strip_prefix(".str.") {
+                if let Ok(idx) = stripped.parse::<usize>() {
+                    if idx < string_positions.len() {
+                        let pos_in_text = (text.len() as u64) + (string_positions[idx] as u64);
+                        let le = pos_in_text.to_le_bytes();
+                        text[off..off + 8].copy_from_slice(&le);
+                        continue;
+                    }
+                }
+            }
+            if sym == "__argc" {
+                let pos_in_text = (text.len() as u64) + (argc_ro_offset as u64);
+                let le = pos_in_text.to_le_bytes();
+                text[off..off + 8].copy_from_slice(&le);
+                continue;
+            }
+            if sym == "__argv" {
+                let pos_in_text = (text.len() as u64) + (argv_ro_offset as u64);
+                let le = pos_in_text.to_le_bytes();
+                text[off..off + 8].copy_from_slice(&le);
+                continue;
+            }
+            if let Some(lbl) = func_label_map.get(&sym) {
+                if let Some(v) = label_positions.get(lbl) {
+                    let pos_in_text = *v as u64;
+                    let le = pos_in_text.to_le_bytes();
+                    text[off..off + 8].copy_from_slice(&le);
+                    continue;
+                }
+            }
+            if sym == "_start" {
+                let le = (0u64).to_le_bytes();
+                text[off..off + 8].copy_from_slice(&le);
+                continue;
+            }
+        }
     }
 
     let mut pe: Vec<u8> = Vec::new();
@@ -161,6 +260,7 @@ pub fn write_executable_from_sections(
     pe.extend_from_slice(&0u32.to_le_bytes());
     pe.extend_from_slice(&16u32.to_le_bytes());
 
+    let data_directory_offset = pe.len();
     pe.extend_from_slice(&[0u8; 16 * 8]);
 
     let mut sh_name = [0u8; 8];
@@ -187,13 +287,14 @@ pub fn write_executable_from_sections(
     pe.extend_from_slice(&0u32.to_le_bytes());
     pe.extend_from_slice(&0u16.to_le_bytes());
     pe.extend_from_slice(&0u16.to_le_bytes());
-    pe.extend_from_slice(&(0x40000040u32).to_le_bytes());
+
+    pe.extend_from_slice(&(0xC0000040u32).to_le_bytes());
 
     if (pe.len() as u32) < size_of_headers {
         pe.resize(size_of_headers as usize, 0);
     }
 
-    let mut file_bytes: Vec<u8> = pe;
+    let mut file_bytes: Vec<u8> = pe.clone();
     file_bytes.extend_from_slice(&text);
 
     let pad_text = (FILE_ALIGNMENT as usize) - (text.len() % FILE_ALIGNMENT as usize);
@@ -201,10 +302,106 @@ pub fn write_executable_from_sections(
         file_bytes.resize(file_bytes.len() + pad_text, 0);
     }
 
+    let rodata_start = file_bytes.len();
     file_bytes.extend_from_slice(rodata);
     let pad_rdata = (FILE_ALIGNMENT as usize) - (rodata.len() % FILE_ALIGNMENT as usize);
     if pad_rdata != FILE_ALIGNMENT as usize {
         file_bytes.resize(file_bytes.len() + pad_rdata, 0);
+    }
+
+    if !import_funcs.is_empty() {
+        let import_block_offset_in_file = file_bytes.len();
+        file_bytes.extend_from_slice(&import_data);
+
+        let import_block_rva = rdata_rva + ((import_block_offset_in_file - rodata_start) as u64);
+
+        let mut cursor = import_block_offset_in_file;
+
+        let n = import_funcs.len();
+
+        let ilt_file_off = cursor;
+        cursor += (n + 1) * 8;
+
+        let iat_file_off = cursor;
+        cursor += (n + 1) * 8;
+
+        let name_entries_file_off = cursor;
+
+        let mut name_rvas: Vec<u32> = Vec::new();
+        for i in 0..n {
+            let mut pos = cursor;
+
+            pos += 2;
+
+            while file_bytes[pos] != 0 {
+                pos += 1;
+            }
+            let name_rva =
+                (import_block_rva as u32) + (cursor as u32 - import_block_offset_in_file as u32);
+            name_rvas.push(name_rva);
+
+            cursor = pos + 1;
+        }
+
+        let dll_name_file_off = cursor;
+
+        while file_bytes[cursor] != 0 {
+            cursor += 1;
+        }
+        cursor += 1;
+
+        let import_descriptor_file_off = cursor;
+
+        for (i, _f) in import_funcs.iter().enumerate() {
+            let ilt_entry_off = ilt_file_off + (i * 8);
+            let iat_entry_off = iat_file_off + (i * 8);
+            let by_name_rva = name_rvas[i] as u64;
+
+            let mut buf = (by_name_rva).to_le_bytes();
+            for j in 0..8 {
+                file_bytes[ilt_entry_off + j] = buf[j];
+                file_bytes[iat_entry_off + j] = buf[j];
+            }
+        }
+
+        let ilt_rva =
+            import_block_rva as u32 + (ilt_file_off as u32 - import_block_offset_in_file as u32);
+        let iat_rva =
+            import_block_rva as u32 + (iat_file_off as u32 - import_block_offset_in_file as u32);
+        let dll_name_rva = import_block_rva as u32
+            + (dll_name_file_off as u32 - import_block_offset_in_file as u32);
+
+        file_bytes[import_descriptor_file_off..import_descriptor_file_off + 4]
+            .copy_from_slice(&ilt_rva.to_le_bytes());
+
+        file_bytes[import_descriptor_file_off + 12..import_descriptor_file_off + 16]
+            .copy_from_slice(&dll_name_rva.to_le_bytes());
+        file_bytes[import_descriptor_file_off + 16..import_descriptor_file_off + 20]
+            .copy_from_slice(&iat_rva.to_le_bytes());
+
+        let import_dir_rva =
+            (rdata_rva + (import_descriptor_file_off as u64 - rodata_start as u64)) as u32;
+        let import_dir_size = ((cursor + 20) - import_descriptor_file_off) as u32;
+
+        let imp_off = data_directory_offset + (1 * 8);
+        pe[imp_off..imp_off + 4].copy_from_slice(&import_dir_rva.to_le_bytes());
+        pe[imp_off + 4..imp_off + 8].copy_from_slice(&import_dir_size.to_le_bytes());
+
+        for r in reloc_entries.iter() {
+            if let Some(sym_name) = &r.sym_name {
+                let s = String::from_utf8_lossy(sym_name).into_owned();
+                if import_funcs.contains(&s) {
+                    let idx = import_funcs.iter().position(|x| x == &s).unwrap();
+                    let iat_entry_va = IMAGE_BASE
+                        + (rdata_rva as u64)
+                        + (iat_file_off as u64 - import_block_offset_in_file as u64)
+                        + (idx as u64 * 8);
+                    let le = (iat_entry_va as u64).to_le_bytes();
+                    let off = r.offset as usize;
+                    text[off..off + 8].copy_from_slice(&le);
+                }
+            }
+        }
     }
 
     std::fs::create_dir_all(out_dir).map_err(|e| format!("failed to create out dir: {}", e))?;
@@ -283,7 +480,7 @@ mod tests {
         let exe = compile_project(pd, "test", "x86_64-windows", None).expect("compile");
         let data = std::fs::read(&exe).expect("read exe");
 
-        let helpers = runtime_helpers::get_helpers();
+        let helpers = runtime_helpers::get_helpers("x86_64-windows");
         let helper = helpers.get("len").expect("helper missing");
 
         assert!(data.windows(helper.len()).any(|w| w == helper.as_slice()));

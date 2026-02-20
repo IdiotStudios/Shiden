@@ -1171,24 +1171,72 @@ pub fn compile_project(
                     .symbol_id(sym_name.as_bytes())
                     .ok_or_else(|| format!("symbol not found {}", sym_name))?;
 
-                text.extend_from_slice(&[0x48, 0xBE]);
-                let imm64_off = text.len();
-                text.write_u64::<LittleEndian>(0).unwrap();
+                if target.contains("windows") {
+                    text.extend_from_slice(&[0x48, 0xBA]);
+                    let ptr_off = text.len();
+                    text.write_u64::<LittleEndian>(0).unwrap();
 
-                text.push(0xBA);
-                text.write_u32::<LittleEndian>(s.len() as u32).unwrap();
+                    text.extend_from_slice(&[0x48, 0xA1]);
+                    let gsh_off = text.len();
+                    text.write_u64::<LittleEndian>(0).unwrap();
+                    text.extend_from_slice(&[0xFF, 0xD0]);
 
-                text.extend_from_slice(&[0xB8, 0x01, 0x00, 0x00, 0x00]);
+                    text.extend_from_slice(&[0x48, 0x89, 0xC1]);
 
-                text.extend_from_slice(&[0xBF, 0x01, 0x00, 0x00, 0x00]);
+                    text.push(0x41);
+                    text.push(0xB8);
+                    let len_off = text.len();
+                    text.write_u32::<LittleEndian>(s.len() as u32).unwrap();
 
-                text.extend_from_slice(&[0x0F, 0x05]);
-                reloc_entries.push(RelocEntry {
-                    offset: imm64_off,
-                    sym_name: Some(sym_name.into_bytes()),
-                    _is_call: false,
-                });
-                string_iter_idx += 1;
+                    text.extend_from_slice(&[0x44, 0x31, 0xC9]);
+
+                    text.extend_from_slice(&[0x48, 0x83, 0xEC, 0x20]);
+
+                    text.extend_from_slice(&[0x48, 0xA1]);
+                    let wf_off = text.len();
+                    text.write_u64::<LittleEndian>(0).unwrap();
+
+                    text.extend_from_slice(&[0xFF, 0xD0]);
+
+                    text.extend_from_slice(&[0x48, 0x83, 0xC4, 0x20]);
+
+                    reloc_entries.push(RelocEntry {
+                        offset: ptr_off,
+                        sym_name: Some(sym_name.into_bytes()),
+                        _is_call: false,
+                    });
+
+                    reloc_entries.push(RelocEntry {
+                        offset: gsh_off,
+                        sym_name: Some(b"GetStdHandle".to_vec()),
+                        _is_call: false,
+                    });
+                    reloc_entries.push(RelocEntry {
+                        offset: wf_off,
+                        sym_name: Some(b"WriteFile".to_vec()),
+                        _is_call: false,
+                    });
+                    string_iter_idx += 1;
+                } else {
+                    text.extend_from_slice(&[0x48, 0xBE]);
+                    let imm64_off = text.len();
+                    text.write_u64::<LittleEndian>(0).unwrap();
+
+                    text.push(0xBA);
+                    text.write_u32::<LittleEndian>(s.len() as u32).unwrap();
+
+                    text.extend_from_slice(&[0xB8, 0x01, 0x00, 0x00, 0x00]);
+
+                    text.extend_from_slice(&[0xBF, 0x01, 0x00, 0x00, 0x00]);
+
+                    text.extend_from_slice(&[0x0F, 0x05]);
+                    reloc_entries.push(RelocEntry {
+                        offset: imm64_off,
+                        sym_name: Some(sym_name.into_bytes()),
+                        _is_call: false,
+                    });
+                    string_iter_idx += 1;
+                }
             }
             IrInstr::PushConst(v) => {
                 text.extend_from_slice(&[0x48, 0xB8]);
@@ -1518,9 +1566,24 @@ pub fn compile_project(
     text.extend_from_slice(&[0x48, 0x89, 0xEC]);
     text.push(0x5D);
 
-    text.extend_from_slice(&[0xB8, 0x3C, 0x00, 0x00, 0x00]);
-    text.extend_from_slice(&[0x31, 0xFF]);
-    text.extend_from_slice(&[0x0F, 0x05]);
+    if target.contains("windows") {
+        text.extend_from_slice(&[0x31, 0xC9]);
+
+        text.extend_from_slice(&[0x48, 0xA1]);
+        let exit_off = text.len();
+        text.write_u64::<LittleEndian>(0).unwrap();
+        text.extend_from_slice(&[0xFF, 0xD0]);
+
+        reloc_entries.push(RelocEntry {
+            offset: exit_off,
+            sym_name: Some(b"ExitProcess".to_vec()),
+            _is_call: false,
+        });
+    } else {
+        text.extend_from_slice(&[0xB8, 0x3C, 0x00, 0x00, 0x00]);
+        text.extend_from_slice(&[0x31, 0xFF]);
+        text.extend_from_slice(&[0x0F, 0x05]);
+    }
 
     for (placeholder_off, lbl) in jump_placeholders.iter() {
         let label_pos = label_positions
@@ -1577,7 +1640,7 @@ pub fn compile_project(
             .map_err(|e| format!("Failed to write object file: {}", e))?;
     }
 
-    let helpers: std::collections::BTreeMap<&str, Vec<u8>> = runtime_helpers::get_helpers();
+    let helpers: std::collections::BTreeMap<&str, Vec<u8>> = runtime_helpers::get_helpers(target);
 
     let mut helper_pos: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
     for (name, bytes) in helpers.iter() {
@@ -1608,6 +1671,19 @@ pub fn compile_project(
                 sym_name: Some(b"array_get".to_vec()),
                 _is_call: false,
             });
+            if target.contains("windows") {
+                reloc_entries.push(RelocEntry {
+                    offset: pos + 83,
+                    sym_name: Some(b"GetStdHandle".to_vec()),
+                    _is_call: false,
+                });
+
+                reloc_entries.push(RelocEntry {
+                    offset: pos + 116,
+                    sym_name: Some(b"WriteFile".to_vec()),
+                    _is_call: false,
+                });
+            }
         }
 
         if *name == "__build_args_array" {
@@ -1635,6 +1711,27 @@ pub fn compile_project(
             reloc_entries.push(RelocEntry {
                 offset: pos + 89,
                 sym_name: Some(b"push".to_vec()),
+                _is_call: false,
+            });
+            if target.contains("windows") {
+                reloc_entries.push(RelocEntry {
+                    offset: pos + 41,
+                    sym_name: Some(b"GetCommandLineA".to_vec()),
+                    _is_call: false,
+                });
+            }
+        }
+
+        if *name == "heap_alloc" && target.contains("windows") {
+            reloc_entries.push(RelocEntry {
+                offset: pos + 15,
+                sym_name: Some(b"GetProcessHeap".to_vec()),
+                _is_call: false,
+            });
+
+            reloc_entries.push(RelocEntry {
+                offset: pos + 36,
+                sym_name: Some(b"HeapAlloc".to_vec()),
                 _is_call: false,
             });
         }
