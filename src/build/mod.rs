@@ -1117,15 +1117,18 @@ pub fn compile_project(
 
     text.extend_from_slice(&[0x48, 0x8B, 0x04, 0x24]);
 
-    text.extend_from_slice(&[0x48, 0xA3]);
+    text.extend_from_slice(&[0x48, 0xB9]);
     let argc_reloc_offset = text.len();
     text.write_u64::<LittleEndian>(0).unwrap();
 
+    text.extend_from_slice(&[0x48, 0x89, 0x01]);
+
     text.extend_from_slice(&[0x48, 0x8D, 0x44, 0x24, 0x08]);
 
-    text.extend_from_slice(&[0x48, 0xA3]);
+    text.extend_from_slice(&[0x48, 0xB9]);
     let argv_reloc_offset = text.len();
     text.write_u64::<LittleEndian>(0).unwrap();
+    text.extend_from_slice(&[0x48, 0x89, 0x01]);
 
     text.push(0x55);
     text.extend_from_slice(&[0x48, 0x89, 0xE5]);
@@ -1176,7 +1179,7 @@ pub fn compile_project(
                     let ptr_off = text.len();
                     text.write_u64::<LittleEndian>(0).unwrap();
 
-                    text.extend_from_slice(&[0x48, 0xA1]);
+                    text.extend_from_slice(&[0x48, 0xB8]);
                     let gsh_off = text.len();
                     text.write_u64::<LittleEndian>(0).unwrap();
                     text.extend_from_slice(&[0xFF, 0xD0]);
@@ -1185,7 +1188,7 @@ pub fn compile_project(
 
                     text.push(0x41);
                     text.push(0xB8);
-                    let len_off = text.len();
+                    let _len_off = text.len();
                     text.write_u32::<LittleEndian>(s.len() as u32).unwrap();
 
                     text.extend_from_slice(&[0x44, 0x31, 0xC9]);
@@ -1569,7 +1572,7 @@ pub fn compile_project(
     if target.contains("windows") {
         text.extend_from_slice(&[0x31, 0xC9]);
 
-        text.extend_from_slice(&[0x48, 0xA1]);
+        text.extend_from_slice(&[0x48, 0xB8]);
         let exit_off = text.len();
         text.write_u64::<LittleEndian>(0).unwrap();
         text.extend_from_slice(&[0xFF, 0xD0]);
