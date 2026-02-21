@@ -7,10 +7,12 @@ Shiden has a .sd file format
 VSCode-Extension: [here](https://marketplace.visualstudio.com/items?itemName=IdiotStudios.shiden)  
 Flavortown-Project: [here](https://flavortown.hackclub.com/projects/10866)  
 Browser-Extension: (hint...) (hint2: its gonna take a while) (future plan)  
-Shiden-Hosting: (hint...)  
-Shiden-Playground: (hint...)
-Shiden-LLM-Code-Assistant: (hint...)  
-Shiden-Package-Registry: (hint...)
+Shiden-Hosting: (hint...) (Deciding on a provider)  
+Shiden-Playground: (hint...) (too much work rn)
+Shiden-LLM-Code-Assistant: (hint...) (I dont got the gpu for this so need to find a provider)  
+Shiden-Package-Registry: (hint...) (Deciding on a provider)  
+Shiden-Docs: (you wish) (future plan)  
+Benchmarks: (hmm very soon)  
 
 ## Todo
 
@@ -70,9 +72,8 @@ CLI NAME: Shiden
 * Shiden init (makes a new project)
 * Shiden check (checks code for errors — supports `--format json` for structured diagnostics)
 * Shiden run (release mode by default, add --debug for debug mode)
-* Shiden build (release mode by default, add --debug for debug mode)
+* Shiden compile (release mode by default, add --debug for debug mode)
 * Shiden clean (removes build artifacts)
-* Shiden format (formats code)
 * Shiden tests (runs tests [future plan])
 
 ### Shiden init/new folder formats
@@ -106,6 +107,7 @@ shiden.toml:
 ```
 
 ## Contributing
+
 If you do wanna contribute <3 then feel free to create issues or pull requests! I love the support.
 
 ## License
