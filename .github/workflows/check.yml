@@ -22,7 +22,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     environment:
-      name: check-rust
+      name: checks
     permissions:
       pages: write
       id-token: write
@@ -59,7 +59,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     environment:
-      name: check-shiden
+      name: checks
     permissions:
       pages: write
       id-token: write
