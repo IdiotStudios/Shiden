@@ -20,7 +20,6 @@ jobs:
           script: |
             const workflows = new Set([
               "check.yml",
-              "check2.yml",
               "pages.yml",
               "release.yml",
             ]);

@@ -1,4 +1,4 @@
-name: Check Rust
+name: Checks
 
 on:
   push:
@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - 'src/**'
+      - 'examples/**'
+      - 'rewrite/**'
       - 'Cargo.toml'
   workflow_dispatch:
 
@@ -50,3 +52,51 @@ jobs:
 
       - name: Run cargo test
         run: cargo test --verbose
+  shiden:
+    runs-on: ${{ matrix.os }}
+    needs: rust
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    environment:
+      name: check-shiden
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Cache Cargo directories
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-
+
+      - name: Run cargo build
+        run: cargo build --release
+
+      - name: Run Shiden Brainfuck interpreter
+        run: cargo run -- run examples/brainfuck
+
+      - name: Run Shiden Hello World example
+        run: cargo run -- run examples/HelloWorld
+
+      # Soon
+      #- name: Run Shiden Fibonacci example
+      #  run: cargo run -- run examples/fibonacci
+      
+      - name: Run Shiden HTTP server (with timeout)
+        if: matrix.os == 'ubuntu-latest'
+        timeout-minutes: 1
+        run: timeout 5s cargo run -- run examples/http\ server || [ $? -eq 124 ]
