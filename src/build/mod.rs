@@ -1581,7 +1581,7 @@ pub fn compile_project(
     if target.contains("windows") {
         text.extend_from_slice(&[0x31, 0xC9]);
 
-        text.extend_from_slice(&[0x48, 0x83, 0xEC, 0x20]);
+        text.extend_from_slice(&[0x48, 0x83, 0xEC, 0x28]);
 
         text.extend_from_slice(&[0x48, 0xB8]);
         let exit_off = text.len();
@@ -1649,9 +1649,9 @@ pub fn compile_project(
     if !target.contains("windows") {
         let obj_bytes = obj
             .write()
-        
-        text.extend_from_slice(&[0x48, 0x83, 0xEC, 0x28]);
             .map_err(|e| format!("Failed to write object file: {}", e))?;
+        std::fs::write(&obj_path, obj_bytes)
+            .map_err(|e| format!("Failed to write object file {}: {}", obj_path.display(), e))?;
     }
 
     let helpers: std::collections::BTreeMap<&str, Vec<u8>> = runtime_helpers::get_helpers(target);
