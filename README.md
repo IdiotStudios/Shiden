@@ -12,7 +12,7 @@ Used AI for inline code completions and for documentation writing.
 
 [VSCode-Extension](https://marketplace.visualstudio.com/items?itemName=IdiotStudios.shiden)  
 [Flavortown-Project](https://flavortown.hackclub.com/projects/10866)  
-[Shiden-Docs:](https://shiden.arson.dev/docs)  
+[Shiden-Docs](https://shiden.arson.dev/docs)  
 [Browser-Extension]() (hint...)  
 [Shiden-Hosting]() (hint...)  
 [Shiden-Playground]() (hint...)  
