@@ -172,8 +172,8 @@ pub fn write_executable_from_sections(
             if let Some(stripped) = sym.strip_prefix(".str.") {
                 if let Ok(idx) = stripped.parse::<usize>() {
                     if idx < string_positions.len() {
-                        let pos_in_text = (text.len() as u64) + (string_positions[idx] as u64);
-                        let va = IMAGE_BASE + text_rva + pos_in_text;
+                        let pos_in_rdata = string_positions[idx] as u64;
+                        let va = IMAGE_BASE + rdata_rva + pos_in_rdata;
                         let le = va.to_le_bytes();
                         text[off..off + 8].copy_from_slice(&le);
                         continue;
