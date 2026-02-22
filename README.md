@@ -6,12 +6,12 @@ Shiden has a .sd file format
 
 VSCode-Extension: [here](https://marketplace.visualstudio.com/items?itemName=IdiotStudios.shiden)  
 Flavortown-Project: [here](https://flavortown.hackclub.com/projects/10866)  
+Shiden-Docs: [here](https://shiden.arson.dev/docs)  
 Browser-Extension: (hint...) (hint2: its gonna take a while) (future plan)  
 Shiden-Hosting: (hint...) (Deciding on a provider)  
 Shiden-Playground: (hint...) (too much work rn)
 Shiden-LLM-Code-Assistant: (hint...) (I dont got the gpu for this so need to find a provider)  
 Shiden-Package-Registry: (hint...) (Deciding on a provider)  
-Shiden-Docs: (you wish) (future plan)  
 Benchmarks: (hmm very soon)  
 
 ## Todo
