@@ -4,6 +4,10 @@ Shiden is a high-performance, ahead-of-time compiled programming language built 
 
 Shiden has a .sd file format
 
+## AI Notice
+
+Used AI for inline code completions and for documentation writing.
+
 ## Some things we have
 
 [VSCode-Extension](https://marketplace.visualstudio.com/items?itemName=IdiotStudios.shiden)  
