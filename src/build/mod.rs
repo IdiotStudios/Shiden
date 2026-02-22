@@ -1576,6 +1576,8 @@ pub fn compile_project(
     if target.contains("windows") {
         text.extend_from_slice(&[0x31, 0xC9]);
 
+        text.extend_from_slice(&[0x48, 0x83, 0xEC, 0x20]);
+
         text.extend_from_slice(&[0x48, 0xB8]);
         let exit_off = text.len();
         text.write_u64::<LittleEndian>(0).unwrap();
