@@ -429,6 +429,12 @@ pub fn write_executable_from_sections(
         }
     }
 
+    let expected_size =
+        (size_of_headers as usize) + (text_raw_size as usize) + (rdata_raw_size as usize);
+    if file_bytes.len() < expected_size {
+        file_bytes.resize(expected_size, 0);
+    }
+
     std::fs::create_dir_all(out_dir).map_err(|e| format!("failed to create out dir: {}", e))?;
     let exe_name = format!(
         "{}{}",
