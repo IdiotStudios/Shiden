@@ -1175,6 +1175,10 @@ pub fn compile_project(
                     .ok_or_else(|| format!("symbol not found {}", sym_name))?;
 
                 if target.contains("windows") {
+                    text.extend_from_slice(&[0x48, 0x83, 0xEC, 0x30]);
+
+                    text.extend_from_slice(&[0x48, 0xC7, 0x44, 0x24, 0x20, 0x00, 0x00, 0x00, 0x00]);
+
                     text.extend_from_slice(&[0x48, 0xC7, 0xC1, 0xF5, 0xFF, 0xFF, 0xFF]);
 
                     text.extend_from_slice(&[0x48, 0xB8]);
@@ -1193,7 +1197,6 @@ pub fn compile_project(
                     let _len_off = text.len();
                     text.write_u32::<LittleEndian>(s.len() as u32).unwrap();
 
-                    text.extend_from_slice(&[0x48, 0x83, 0xEC, 0x20]);
                     text.extend_from_slice(&[0x4C, 0x8D, 0x4C, 0x24, 0x18]);
 
                     text.extend_from_slice(&[0x48, 0xB8]);
@@ -1202,7 +1205,7 @@ pub fn compile_project(
 
                     text.extend_from_slice(&[0xFF, 0xD0]);
 
-                    text.extend_from_slice(&[0x48, 0x83, 0xC4, 0x20]);
+                    text.extend_from_slice(&[0x48, 0x83, 0xC4, 0x30]);
 
                     reloc_entries.push(RelocEntry {
                         offset: ptr_off,
