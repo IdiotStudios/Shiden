@@ -49,7 +49,7 @@ Shiden supports compiling for multiple platforms. The compiler automatically det
 ### Supported Platforms
 
 * **Linux** (`x86_64-linux`) - Implemented
-* **Windows** (`x86_64-windows`) - Next up
+* **Windows** (`x86_64-windows`) - In progress (needs more work, especially around runtime args handling)
 * **macOS** (`x86_64-macos`) - Planned (after Windows)
 
 ### Configure Targets

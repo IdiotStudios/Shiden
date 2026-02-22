@@ -15,6 +15,7 @@ pub fn write_executable_from_sections(
     label_positions: &std::collections::HashMap<usize, usize>,
     argc_ro_offset: usize,
     argv_ro_offset: usize,
+    argv_store_ro_offset: usize,
 ) -> Result<PathBuf, String> {
     const IMAGE_BASE: u64 = 0x1400_0000_00u64;
     const SECTION_ALIGNMENT: u32 = 0x1000;
@@ -83,6 +84,7 @@ pub fn write_executable_from_sections(
                 && !s.starts_with(".str.")
                 && s != "__argc"
                 && s != "__argv"
+                && s != "__argv_store"
                 && s != "_start"
                 && !func_label_map.contains_key(&s)
             {
@@ -189,6 +191,13 @@ pub fn write_executable_from_sections(
             }
             if sym == "__argv" {
                 let pos_in_rdata = argv_ro_offset as u64;
+                let va = IMAGE_BASE + rdata_rva + pos_in_rdata;
+                let le = va.to_le_bytes();
+                text[off..off + 8].copy_from_slice(&le);
+                continue;
+            }
+            if sym == "__argv_store" {
+                let pos_in_rdata = argv_store_ro_offset as u64;
                 let va = IMAGE_BASE + rdata_rva + pos_in_rdata;
                 let le = va.to_le_bytes();
                 text[off..off + 8].copy_from_slice(&le);

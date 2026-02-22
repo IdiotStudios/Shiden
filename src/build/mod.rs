@@ -1054,6 +1054,13 @@ pub fn compile_project(
     let argc_ro_offset = rodata.len();
     rodata.extend_from_slice(&[0u8; 16]);
     let argv_ro_offset = argc_ro_offset + 8;
+    let argv_store_offset = if target.contains("windows") {
+        let offset = rodata.len();
+        rodata.resize(rodata.len() + (8 * 64), 0);
+        offset
+    } else {
+        0
+    };
 
     let rodata_id = data_id;
     let rodata_offset = obj.append_section_data(rodata_id, &rodata, 1);
@@ -1097,6 +1104,20 @@ pub fn compile_project(
     };
     obj.add_symbol(argv_sym);
 
+    if target.contains("windows") {
+        let argv_store_sym = Symbol {
+            name: b"__argv_store".to_vec(),
+            value: (argv_store_offset as u64) + rodata_offset,
+            size: (8 * 64) as u64,
+            kind: object::SymbolKind::Data,
+            scope: SymbolScope::Linkage,
+            weak: false,
+            section: SymbolSection::Section(rodata_id),
+            flags: object::SymbolFlags::None,
+        };
+        obj.add_symbol(argv_store_sym);
+    }
+
     let print_sym = Symbol {
         name: b"_print_i64".to_vec(),
         value: 0,
@@ -1114,21 +1135,165 @@ pub fn compile_project(
     let _locals_id_opt: Option<object::write::SymbolId> = None;
 
     let mut text = Vec::new();
+    let mut argc_reloc_offset: Option<usize> = None;
+    let mut argv_reloc_offset: Option<usize> = None;
+    let mut argv_store_reloc_offset: Option<usize> = None;
+    let mut gcl_reloc_offset: Option<usize> = None;
 
-    text.extend_from_slice(&[0x48, 0x8B, 0x04, 0x24]);
+    if target.contains("windows") {
+        fn mark_label(
+            labels: &mut std::collections::HashMap<&'static str, usize>,
+            name: &'static str,
+            buf: &Vec<u8>,
+        ) {
+            labels.insert(name, buf.len());
+        }
 
-    text.extend_from_slice(&[0x48, 0xB9]);
-    let argc_reloc_offset = text.len();
-    text.write_u64::<LittleEndian>(0).unwrap();
+        fn emit_jump(
+            buf: &mut Vec<u8>,
+            jumps: &mut Vec<(usize, &'static str)>,
+            opcode: u8,
+            label: &'static str,
+        ) {
+            buf.push(opcode);
+            jumps.push((buf.len(), label));
+            buf.push(0);
+        }
 
-    text.extend_from_slice(&[0x48, 0x89, 0x01]);
+        let mut labels: std::collections::HashMap<&'static str, usize> =
+            std::collections::HashMap::new();
+        let mut jumps: Vec<(usize, &'static str)> = Vec::new();
 
-    text.extend_from_slice(&[0x48, 0x8D, 0x44, 0x24, 0x08]);
+        text.extend_from_slice(&[0x48, 0x83, 0xEC, 0x28]);
 
-    text.extend_from_slice(&[0x48, 0xB9]);
-    let argv_reloc_offset = text.len();
-    text.write_u64::<LittleEndian>(0).unwrap();
-    text.extend_from_slice(&[0x48, 0x89, 0x01]);
+        text.extend_from_slice(&[0x48, 0xB8]);
+        let gcl_off = text.len();
+        text.write_u64::<LittleEndian>(0).unwrap();
+        text.extend_from_slice(&[0xFF, 0xD0]);
+        text.extend_from_slice(&[0x48, 0x83, 0xC4, 0x28]);
+
+        text.extend_from_slice(&[0x49, 0x89, 0xC2]);
+
+        text.extend_from_slice(&[0x45, 0x31, 0xC9]);
+
+        text.extend_from_slice(&[0x49, 0xB8]);
+        let argv_store_off = text.len();
+        text.write_u64::<LittleEndian>(0).unwrap();
+
+        mark_label(&mut labels, "skip_space", &text);
+        text.extend_from_slice(&[0x41, 0x8A, 0x02]);
+        text.extend_from_slice(&[0x3C, 0x00]);
+        emit_jump(&mut text, &mut jumps, 0x74, "done_no_args");
+        text.extend_from_slice(&[0x3C, 0x20]);
+        emit_jump(&mut text, &mut jumps, 0x75, "skip_prog");
+        text.extend_from_slice(&[0x49, 0xFF, 0xC2]);
+        emit_jump(&mut text, &mut jumps, 0xEB, "skip_space");
+
+        mark_label(&mut labels, "skip_prog", &text);
+        text.extend_from_slice(&[0x3C, 0x22]);
+        emit_jump(&mut text, &mut jumps, 0x75, "skip_prog_unquoted");
+        text.extend_from_slice(&[0x49, 0xFF, 0xC2]);
+
+        mark_label(&mut labels, "skip_quoted_prog", &text);
+        text.extend_from_slice(&[0x41, 0x8A, 0x02]);
+        text.extend_from_slice(&[0x3C, 0x00]);
+        emit_jump(&mut text, &mut jumps, 0x74, "done_no_args");
+        text.extend_from_slice(&[0x3C, 0x22]);
+        emit_jump(&mut text, &mut jumps, 0x74, "end_quoted_prog");
+        text.extend_from_slice(&[0x49, 0xFF, 0xC2]);
+        emit_jump(&mut text, &mut jumps, 0xEB, "skip_quoted_prog");
+
+        mark_label(&mut labels, "end_quoted_prog", &text);
+        text.extend_from_slice(&[0x49, 0xFF, 0xC2]);
+        emit_jump(&mut text, &mut jumps, 0xEB, "parse_loop");
+
+        mark_label(&mut labels, "skip_prog_unquoted", &text);
+        mark_label(&mut labels, "skip_unquoted_prog", &text);
+        text.extend_from_slice(&[0x41, 0x8A, 0x02]);
+        text.extend_from_slice(&[0x3C, 0x00]);
+        emit_jump(&mut text, &mut jumps, 0x74, "done_no_args");
+        text.extend_from_slice(&[0x3C, 0x20]);
+        emit_jump(&mut text, &mut jumps, 0x74, "parse_loop");
+        text.extend_from_slice(&[0x49, 0xFF, 0xC2]);
+        emit_jump(&mut text, &mut jumps, 0xEB, "skip_unquoted_prog");
+
+        mark_label(&mut labels, "parse_loop", &text);
+        mark_label(&mut labels, "skip_spaces_args", &text);
+        text.extend_from_slice(&[0x41, 0x8A, 0x02]);
+        text.extend_from_slice(&[0x3C, 0x00]);
+        emit_jump(&mut text, &mut jumps, 0x74, "done");
+        text.extend_from_slice(&[0x3C, 0x20]);
+        emit_jump(&mut text, &mut jumps, 0x75, "token_start");
+        text.extend_from_slice(&[0x49, 0xFF, 0xC2]);
+        emit_jump(&mut text, &mut jumps, 0xEB, "skip_spaces_args");
+
+        mark_label(&mut labels, "token_start", &text);
+        text.extend_from_slice(&[0x4D, 0x89, 0xD3]);
+
+        mark_label(&mut labels, "token_advance", &text);
+        text.extend_from_slice(&[0x41, 0x8A, 0x02]);
+        text.extend_from_slice(&[0x3C, 0x00]);
+        emit_jump(&mut text, &mut jumps, 0x74, "token_end");
+        text.extend_from_slice(&[0x3C, 0x20]);
+        emit_jump(&mut text, &mut jumps, 0x74, "token_end_space");
+        text.extend_from_slice(&[0x49, 0xFF, 0xC2]);
+        emit_jump(&mut text, &mut jumps, 0xEB, "token_advance");
+
+        mark_label(&mut labels, "token_end_space", &text);
+        text.extend_from_slice(&[0x41, 0xC6, 0x02, 0x00]);
+        text.extend_from_slice(&[0x49, 0xFF, 0xC2]);
+
+        mark_label(&mut labels, "token_end", &text);
+        text.extend_from_slice(&[0x4F, 0x89, 0x1C, 0xC8]);
+        text.extend_from_slice(&[0x49, 0xFF, 0xC1]);
+        emit_jump(&mut text, &mut jumps, 0xEB, "parse_loop");
+
+        mark_label(&mut labels, "done_no_args", &text);
+        mark_label(&mut labels, "done", &text);
+        text.extend_from_slice(&[0x48, 0xB9]);
+        let argc_store_off = text.len();
+        text.write_u64::<LittleEndian>(0).unwrap();
+        text.extend_from_slice(&[0x4C, 0x89, 0x09]);
+
+        text.extend_from_slice(&[0x48, 0xB9]);
+        let argv_store_ptr_off = text.len();
+        text.write_u64::<LittleEndian>(0).unwrap();
+        text.extend_from_slice(&[0x4C, 0x89, 0x01]);
+
+        for (pos, label) in jumps {
+            let target = *labels
+                .get(label)
+                .ok_or_else(|| format!("missing label {} in windows arg prologue", label))?;
+            let rel = (target as i64) - ((pos as i64) + 1);
+            if rel < -128 || rel > 127 {
+                return Err(format!("jump out of range for {}: {}", label, rel));
+            }
+            text[pos] = (rel as i8) as u8;
+        }
+
+        gcl_reloc_offset = Some(gcl_off);
+        argv_store_reloc_offset = Some(argv_store_off);
+        argc_reloc_offset = Some(argc_store_off);
+        argv_reloc_offset = Some(argv_store_ptr_off);
+    } else {
+        text.extend_from_slice(&[0x48, 0x8B, 0x04, 0x24]);
+
+        text.extend_from_slice(&[0x48, 0xB9]);
+        let argc_off = text.len();
+        text.write_u64::<LittleEndian>(0).unwrap();
+
+        text.extend_from_slice(&[0x48, 0x89, 0x01]);
+
+        text.extend_from_slice(&[0x48, 0x8D, 0x44, 0x24, 0x08]);
+
+        text.extend_from_slice(&[0x48, 0xB9]);
+        let argv_off = text.len();
+        text.write_u64::<LittleEndian>(0).unwrap();
+        text.extend_from_slice(&[0x48, 0x89, 0x01]);
+
+        argc_reloc_offset = Some(argc_off);
+        argv_reloc_offset = Some(argv_off);
+    }
 
     text.push(0x55);
     text.extend_from_slice(&[0x48, 0x89, 0xE5]);
@@ -1150,16 +1315,34 @@ pub fn compile_project(
 
     let mut reloc_entries: Vec<RelocEntry> = Vec::new();
 
-    reloc_entries.push(RelocEntry {
-        offset: argc_reloc_offset,
-        sym_name: Some(b"__argc".to_vec()),
-        _is_call: false,
-    });
-    reloc_entries.push(RelocEntry {
-        offset: argv_reloc_offset,
-        sym_name: Some(b"__argv".to_vec()),
-        _is_call: false,
-    });
+    if let Some(off) = argc_reloc_offset {
+        reloc_entries.push(RelocEntry {
+            offset: off,
+            sym_name: Some(b"__argc".to_vec()),
+            _is_call: false,
+        });
+    }
+    if let Some(off) = argv_reloc_offset {
+        reloc_entries.push(RelocEntry {
+            offset: off,
+            sym_name: Some(b"__argv".to_vec()),
+            _is_call: false,
+        });
+    }
+    if let Some(off) = argv_store_reloc_offset {
+        reloc_entries.push(RelocEntry {
+            offset: off,
+            sym_name: Some(b"__argv_store".to_vec()),
+            _is_call: false,
+        });
+    }
+    if let Some(off) = gcl_reloc_offset {
+        reloc_entries.push(RelocEntry {
+            offset: off,
+            sym_name: Some(b"GetCommandLineA".to_vec()),
+            _is_call: false,
+        });
+    }
 
     use byteorder::{LittleEndian, WriteBytesExt};
 
@@ -1727,13 +1910,6 @@ pub fn compile_project(
                 sym_name: Some(b"push".to_vec()),
                 _is_call: false,
             });
-            if target.contains("windows") {
-                reloc_entries.push(RelocEntry {
-                    offset: pos + 41,
-                    sym_name: Some(b"GetCommandLineA".to_vec()),
-                    _is_call: false,
-                });
-            }
         }
 
         if *name == "heap_alloc" && target.contains("windows") {
@@ -1765,6 +1941,7 @@ pub fn compile_project(
             &label_positions,
             argc_ro_offset,
             argv_ro_offset,
+            argv_store_offset,
         )?
     } else {
         linux::write_executable_from_sections(
