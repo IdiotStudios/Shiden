@@ -1134,7 +1134,12 @@ pub fn compile_project(
     text.extend_from_slice(&[0x48, 0x89, 0xE5]);
 
     let mut alloc = (locals_count as i64) * 8;
-    if alloc % 16 == 0 {
+    if target.contains("windows") {
+        let rem = alloc % 16;
+        if rem != 0 {
+            alloc += 16 - rem;
+        }
+    } else if alloc % 16 == 0 {
         alloc += 8;
     }
     if alloc > 0 {
@@ -1644,8 +1649,8 @@ pub fn compile_project(
     if !target.contains("windows") {
         let obj_bytes = obj
             .write()
-            .map_err(|e| format!("object write error: {}", e))?;
-        std::fs::write(&obj_path, &obj_bytes)
+        
+        text.extend_from_slice(&[0x48, 0x83, 0xEC, 0x28]);
             .map_err(|e| format!("Failed to write object file: {}", e))?;
     }
 
