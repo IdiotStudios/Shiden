@@ -1,0 +1,181 @@
+fn new main/
+    println("=== Shiden Language Documentation Examples ===")/unit
+    println("")/unit
+
+    demo_types()/unit
+    println("")/unit
+
+    demo_variables()/unit
+    println("")/unit
+
+    demo_expressions()/unit
+    println("")/unit
+
+    demo_control_flow()/unit
+    println("")/unit
+
+    demo_functions()/unit
+    println("")/unit
+
+    demo_arrays()/unit
+    println("")/unit
+
+    println("=== All demos completed! ===")/unit
+fn/
+
+fn new demo_types/
+    println("--- Types Demo ---")/unit
+
+    let count = 42/u64
+    println("u64: {}", count)/unit
+
+    let age = 25/i64
+    println("i64: {}", age)/unit
+
+    let temp = 98/f64
+    println("f64: {}", temp)/unit
+    println("floats are currently broken")/
+
+    let name = "Shiden"/str
+    println("str: {}", name)/unit
+
+    let grade = 'A'/char
+    println("char: {}", grade)/unit
+
+    let ready = true/bool
+    println("bool: {}", ready)/unit
+
+    println("Types demo complete")/unit
+fn/
+
+fn new demo_variables/
+    println("--- Variables Demo ---")/unit
+
+    let immutable = 10/i64
+    println("Immutable variable: {}", immutable)/unit
+
+    let mut mutable = 5/i64
+    println("Initial mutable: {}", mutable)/unit
+    mutable = mutable + 3/i64
+    println("After assignment: {}", mutable)/unit
+
+    let nums = [1, 2, 3]/array
+    println("Array before: {}", nums[1])/unit
+    nums[1] = 99/i64
+    println("Array after index assignment: {}", nums[1])/unit
+
+    println("Variables demo complete")/unit
+fn/
+
+fn new demo_expressions/
+    println("--- Expressions Demo ---")/unit
+
+    let sum = 1 + 2/i64
+    println("Addition: 1 + 2 = {}", sum)/unit
+
+    let product = 3 * 4/i64
+    println("Multiplication: 3 * 4 = {}", product)/unit
+
+    let result = (1 + 2) * 3/i64
+    println("Grouped: (1 + 2) * 3 = {}", result)/unit
+
+    let neg = -5/i64
+    println("Unary minus: -5 = {}", neg)/unit
+
+    let comparison = 10 > 5/bool
+    println("Comparison: 10 > 5 = {}", comparison)/unit
+
+    let logical = true && false/bool
+    println("Logical AND: true && false = {}", logical)/unit
+
+    let or_result = true || false/bool
+    println("Logical OR: true || false = {}", or_result)/unit
+
+    let not_val = !false/bool
+    println("Logical NOT: !false = {}", not_val)/unit
+
+    println("Expressions demo complete")/unit
+fn/
+
+fn new demo_control_flow/
+    println("--- Control Flow Demo ---")/unit
+
+    if 5 > 3/
+        println("if: 5 is greater than 3")/unit
+    if/
+
+    if 2 > 10/
+        println("This won't print")/unit
+    else/
+        println("else: 2 is not greater than 10")/unit
+    if/
+
+    let mut counter = 0/i64
+    while counter < 3/
+        println("while: iteration {}", counter)/unit
+        counter = counter + 1/i64
+    while/
+
+    for n in [10, 20, 30]/
+        println("for: element {}", n)/unit
+    for/
+
+    let mut x = 0/i64
+    while x < 5/
+        x = x + 1/i64
+        if x == 2/
+            println("continue: skipping 2")/unit
+            continue/
+        if/
+        if x == 4/
+            println("break: stopping at 4")/unit
+            break/
+        if/
+        println("Loop value: {}", x)/unit
+    while/
+
+    println("Control flow demo complete")/unit
+fn/
+
+fn new demo_functions/
+    println("--- Functions Demo ---")/unit
+
+    simple_function()/unit
+
+    let value = function_with_return()/i64
+    println("Function returned: {}", value)/unit
+
+    let sum = add_numbers(10, 20)/i64
+    println("add_numbers(10, 20) = {}", sum)/unit
+
+    println("Functions demo complete")/unit
+fn/
+
+fn new simple_function/
+    println("Simple function with no parameters or return value")/unit
+fn/
+
+fn new function_with_return/i64
+    return 42/i64
+fn/
+
+fn new add_numbers(a/i64, b/i64)/i64
+    return a + b/i64
+fn/
+
+fn new demo_arrays/
+    println("--- Arrays Demo ---")/unit
+
+    let numbers = [1, 2, 3, 4, 5]/array
+    println("Array element at index 0: {}", numbers[0])/unit
+    println("Array element at index 2: {}", numbers[2])/unit
+
+    let mut dynamic = []/array
+    push(dynamic, 100)/unit
+    push(dynamic, 200)/unit
+    push(dynamic, 300)/unit
+    println("Dynamic array length: {}", len(dynamic))/unit
+    println("Dynamic array element: {}", dynamic[1])/unit
+
+    println("Arrays demo complete")/unit
+fn/

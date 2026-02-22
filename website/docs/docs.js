@@ -3,10 +3,18 @@ const GITHUB_BRANCH = 'main';
 const DOCS_PATH = 'docs';
 
 const CATEGORIES = {
-  'Getting Started': ['index', 'cli', 'development'],
-  'Language': ['syntax', 'format', 'formatting'],
-  'Compiler': ['build', 'frontend', 'interpreter'],
-  'Libraries': ['libraries-filesystem', 'import-system']
+  'Getting Started': ['index'],
+  'Language': [
+    'syntax',
+    'types',
+    'variables',
+    'functions',
+    'expressions',
+    'control-flow',
+    'modules',
+    'formatting'
+  ],
+  'Standard Library': ['standard-library']
 };
 
 const docsCache = {};
