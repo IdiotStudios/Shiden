@@ -824,7 +824,23 @@ impl<'a> Parser<'a> {
                     } else {
                         return Err("expected ')'".into());
                     }
-                    Ok(Expr::Call { name, args })
+
+                    let mut primary = Expr::Call { name, args };
+                    while let Token::LBracket = &self.cur {
+                        self.advance();
+                        let idx = self.parse_expr()?;
+                        if let Token::RBracket = &self.cur {
+                            self.advance();
+                        } else {
+                            return Err("expected ']'".into());
+                        }
+                        primary = Expr::Index {
+                            expr: Box::new(primary),
+                            index: Box::new(idx),
+                        };
+                    }
+
+                    Ok(primary)
                 } else {
                     let mut primary = Ok(Expr::Identifier(name));
 

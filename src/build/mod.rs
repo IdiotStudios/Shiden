@@ -1175,9 +1175,7 @@ pub fn compile_project(
                     .ok_or_else(|| format!("symbol not found {}", sym_name))?;
 
                 if target.contains("windows") {
-                    text.extend_from_slice(&[0x48, 0xBA]);
-                    let ptr_off = text.len();
-                    text.write_u64::<LittleEndian>(0).unwrap();
+                    text.extend_from_slice(&[0x48, 0xC7, 0xC1, 0xF5, 0xFF, 0xFF, 0xFF]);
 
                     text.extend_from_slice(&[0x48, 0xB8]);
                     let gsh_off = text.len();
@@ -1186,16 +1184,19 @@ pub fn compile_project(
 
                     text.extend_from_slice(&[0x48, 0x89, 0xC1]);
 
+                    text.extend_from_slice(&[0x48, 0xBA]);
+                    let ptr_off = text.len();
+                    text.write_u64::<LittleEndian>(0).unwrap();
+
                     text.push(0x41);
                     text.push(0xB8);
                     let _len_off = text.len();
                     text.write_u32::<LittleEndian>(s.len() as u32).unwrap();
 
-                    text.extend_from_slice(&[0x44, 0x31, 0xC9]);
-
                     text.extend_from_slice(&[0x48, 0x83, 0xEC, 0x20]);
+                    text.extend_from_slice(&[0x4C, 0x8D, 0x4C, 0x24, 0x18]);
 
-                    text.extend_from_slice(&[0x48, 0xA1]);
+                    text.extend_from_slice(&[0x48, 0xB8]);
                     let wf_off = text.len();
                     text.write_u64::<LittleEndian>(0).unwrap();
 
