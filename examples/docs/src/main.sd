@@ -1,5 +1,5 @@
 fn new main/
-    println("=== Shiden Language Documentation Examples ===")/unit
+    println("=== Shiden Language Documentation Examples ===")/
     println("")/unit
 
     demo_types()/unit
