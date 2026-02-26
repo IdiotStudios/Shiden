@@ -4,6 +4,155 @@ use std::fs;
 use std::io::{self, Read};
 use std::time::{Duration, Instant};
 
+#[cfg(target_os = "windows")]
+mod hires_timer {
+    use std::time::Duration;
+    unsafe extern "system" {
+        fn QueryPerformanceFrequency(lpFrequency: *mut i64) -> i32;
+        fn QueryPerformanceCounter(lpPerformanceCount: *mut i64) -> i32;
+    }
+
+    pub struct HighResTimer {
+        freq: u64,
+        start: i64,
+    }
+
+    impl HighResTimer {
+        pub fn now() -> Self {
+            let mut freq: i64 = 0;
+            let mut count: i64 = 0;
+            unsafe {
+                QueryPerformanceFrequency(&mut freq);
+                QueryPerformanceCounter(&mut count);
+            }
+            HighResTimer {
+                freq: freq as u64,
+                start: count,
+            }
+        }
+
+        pub fn elapsed(&self) -> HighResDuration {
+            let mut count: i64 = 0;
+            unsafe {
+                QueryPerformanceCounter(&mut count);
+            }
+            let elapsed_counts = (count - self.start) as u64;
+            let nanos = (elapsed_counts * 1_000_000_000) / self.freq;
+            let picos = ((elapsed_counts * 1_000_000_000_000) / self.freq) % 1_000;
+            HighResDuration { nanos, picos }
+        }
+    }
+
+    pub struct HighResDuration {
+        pub nanos: u64,
+        pub picos: u64,
+    }
+}
+
+#[cfg(target_os = "macos")]
+mod hires_timer {
+    use std::time::Duration;
+    unsafe extern "system" {
+        fn mach_absolute_time() -> u64;
+        fn mach_timebase_info(info: *mut MachTimebaseInfo) -> i32;
+    }
+
+    #[repr(C)]
+    struct MachTimebaseInfo {
+        numer: u32,
+        denom: u32,
+    }
+
+    pub struct HighResTimer {
+        start: u64,
+        numer: u32,
+        denom: u32,
+    }
+
+    impl HighResTimer {
+        pub fn now() -> Self {
+            let mut info = MachTimebaseInfo { numer: 0, denom: 0 };
+            unsafe {
+                mach_timebase_info(&mut info);
+            }
+            HighResTimer {
+                start: unsafe { mach_absolute_time() },
+                numer: info.numer,
+                denom: info.denom,
+            }
+        }
+
+        pub fn elapsed(&self) -> HighResDuration {
+            let end = unsafe { mach_absolute_time() };
+            let elapsed_ticks = end - self.start;
+            let nanos = (elapsed_ticks * self.numer as u64) / self.denom as u64;
+            let picos = ((elapsed_ticks * self.numer as u64 * 1_000) / self.denom as u64) % 1_000;
+            HighResDuration { nanos, picos }
+        }
+    }
+
+    pub struct HighResDuration {
+        pub nanos: u64,
+        pub picos: u64,
+    }
+}
+
+#[cfg(target_os = "linux")]
+mod hires_timer {
+    use std::time::Duration;
+    unsafe extern "C" {
+        fn clock_gettime(clk_id: i32, tp: *mut Timespec) -> i32;
+    }
+
+    const CLOCK_MONOTONIC_RAW: i32 = 4;
+
+    #[repr(C)]
+    struct Timespec {
+        tv_sec: isize,
+        tv_nsec: isize,
+    }
+
+    pub struct HighResTimer {
+        start_sec: isize,
+        start_nsec: isize,
+    }
+
+    impl HighResTimer {
+        pub fn now() -> Self {
+            let mut ts = Timespec {
+                tv_sec: 0,
+                tv_nsec: 0,
+            };
+            unsafe {
+                clock_gettime(CLOCK_MONOTONIC_RAW, &mut ts);
+            }
+            HighResTimer {
+                start_sec: ts.tv_sec,
+                start_nsec: ts.tv_nsec,
+            }
+        }
+
+        pub fn elapsed(&self) -> HighResDuration {
+            let mut ts = Timespec {
+                tv_sec: 0,
+                tv_nsec: 0,
+            };
+            unsafe {
+                clock_gettime(CLOCK_MONOTONIC_RAW, &mut ts);
+            }
+            let nanos = (ts.tv_sec - self.start_sec) as u64 * 1_000_000_000
+                + (ts.tv_nsec - self.start_nsec) as u64;
+            let picos = 0u64;
+            HighResDuration { nanos, picos }
+        }
+    }
+
+    pub struct HighResDuration {
+        pub nanos: u64,
+        pub picos: u64,
+    }
+}
+
 fn red(s: &str) -> String {
     format!("\x1b[31m{}\x1b[0m", s)
 }
@@ -52,11 +201,53 @@ fn select_target(targets: Vec<String>) -> String {
 }
 
 fn format_duration(duration: Duration) -> String {
-    let secs = duration.as_secs_f64();
-    if secs < 1.0 {
-        format!("{:.0}ms", secs * 1000.0)
+    let total_secs = duration.as_secs();
+    let subsec_nanos = duration.subsec_nanos() as u64;
+
+    let minutes = total_secs / 60;
+    let secs = total_secs % 60;
+    let millis = subsec_nanos / 1_000_000;
+    let nanos = subsec_nanos % 1_000;
+    let picos = 0u64;
+
+    format!(
+        "{}m {}s {}ms {}ns {}ps",
+        minutes, secs, millis, nanos, picos
+    )
+}
+
+fn format_hires_duration(duration: hires_timer::HighResDuration) -> String {
+    let total_nanos = duration.nanos;
+    let total_secs = total_nanos / 1_000_000_000;
+    let minutes = total_secs / 60;
+    let secs = total_secs % 60;
+
+    let subsec_nanos = total_nanos % 1_000_000_000;
+    let millis = subsec_nanos / 1_000_000;
+    let nanos = subsec_nanos % 1_000;
+    let picos = duration.picos;
+
+    let mut parts = Vec::new();
+    if minutes > 0 {
+        parts.push(format!("{}m", minutes));
+    }
+    if secs > 0 {
+        parts.push(format!("{}s", secs));
+    }
+    if millis > 0 {
+        parts.push(format!("{}ms", millis));
+    }
+    if nanos > 0 {
+        parts.push(format!("{}ns", nanos));
+    }
+    if picos > 0 {
+        parts.push(format!("{}ps", picos));
+    }
+
+    if parts.is_empty() {
+        "0ns".to_string()
     } else {
-        format!("{:.2}s", secs)
+        parts.join(" ")
     }
 }
 
@@ -170,7 +361,7 @@ pub fn run() {
                                 .unwrap_or_default();
                             let target = select_target(targets);
 
-                            let compile_start = Instant::now();
+                            let compile_start = hires_timer::HighResTimer::now();
                             match crate::build::compile_project(
                                 path,
                                 &proj_name,
@@ -182,10 +373,10 @@ pub fn run() {
                                     eprintln!(
                                         "{} {}",
                                         green("Compiled in"),
-                                        cyan(&format_duration(compile_time))
+                                        cyan(&format_hires_duration(compile_time))
                                     );
 
-                                    let run_start = Instant::now();
+                                    let run_start = hires_timer::HighResTimer::now();
                                     let mut cmd = std::process::Command::new(&exe);
                                     if let Some(out_path) = out.as_ref() {
                                         let file =
@@ -210,7 +401,7 @@ pub fn run() {
                                         eprintln!(
                                             "{} {}",
                                             green("Finished in"),
-                                            cyan(&format_duration(run_time))
+                                            cyan(&format_hires_duration(run_time))
                                         );
                                     }
                                 }

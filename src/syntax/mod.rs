@@ -204,6 +204,37 @@ impl<'a> Lexer<'a> {
                 }
             }
 
+            if let Some(first) = rest.chars().next() {
+                if first == 'i' || first == 'u' || first == 'f' {
+                    let mut num_str = String::new();
+                    let mut j = 1;
+                    for c in rest[1..].chars() {
+                        if c.is_ascii_digit() {
+                            num_str.push(c);
+                            j += 1;
+                        } else {
+                            break;
+                        }
+                    }
+                    if !num_str.is_empty() {
+                        let next_char = rest.chars().nth(j);
+                        if next_char.is_none()
+                            || next_char == Some('\n')
+                            || next_char == Some('\r')
+                            || next_char == Some(' ')
+                            || next_char == Some('\t')
+                            || next_char == Some(',')
+                            || next_char == Some(')')
+                            || next_char == Some('/')
+                        {
+                            let type_str = format!("{}{}", first, num_str);
+                            self.bump(1 + type_str.len());
+                            return (Token::Type(type_str), start_line, start_col);
+                        }
+                    }
+                }
+            }
+
             let mut i = self.pos + 1;
             let mut next_non_ws: Option<char> = None;
             while i < self.src.len() {
@@ -431,6 +462,7 @@ pub enum Expr {
     Char(char),
     Bool(bool),
     Number(String),
+    Float(f64),
     Call {
         name: String,
         args: Vec<Expr>,

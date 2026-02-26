@@ -1,0 +1,8 @@
+[project]
+name = "types"
+version = "0.1.0"
+license = "MIT"
+
+[build]
+opt_level = 3
+targets = ["x86_64-linux"]

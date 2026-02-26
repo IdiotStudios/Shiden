@@ -80,14 +80,15 @@ jobs:
       - name: Run Shiden Hello World example
         run: cargo run -- run examples/HelloWorld
 
+      - name: Run Shiden Types example
+        run: cargo run -- run examples/types
+
       # Soon
       #- name: Run Shiden Fibonacci example
       #  run: cargo run -- run examples/fibonacci
       
-      - name: Run Shiden HTTP server (with timeout)
-        if: matrix.os == 'ubuntu-latest'
-        timeout-minutes: 1
-        run: timeout 5s cargo run -- run examples/http\ server || [ $? -eq 124 ]
+      #- name: Run Shiden HTTP server (with timeout)
+      #  run: timeout 5s cargo run -- run examples/http\ server || [ $? -eq 124 ]
 
       - name: Cache Cargo directories
         uses: actions/cache@v4

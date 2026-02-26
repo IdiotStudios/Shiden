@@ -248,11 +248,15 @@ pub fn compile_project(
     enum IrInstr {
         EmitString(String),
         PushConst(i64),
+        PushConstF(f64),
         BinOp(crate::syntax::BinOp),
+        FloatBinOp(crate::syntax::BinOp),
         Compare(crate::syntax::BinOp),
+        FloatCompare(crate::syntax::BinOp),
         Call(String, usize),
         Ret,
         EmitInt,
+        EmitFloat,
         EmitChar,
         StoreLocal(usize),
         LoadLocal(usize),
@@ -260,6 +264,7 @@ pub fn compile_project(
         Label(usize),
         Jump(usize),
         JumpIfFalse(usize),
+        Truncate(u32),
     }
 
     fn eval_const_integer(e: &crate::syntax::Expr) -> Option<i64> {
@@ -286,6 +291,49 @@ pub fn compile_project(
         }
     }
 
+    fn parse_type_width(ty: &str) -> Result<(char, u32), String> {
+        let mut chars = ty.chars();
+        let kind = chars.next().ok_or_else(|| "empty type".to_string())?;
+
+        if kind != 'i'
+            && kind != 'u'
+            && kind != 'f'
+            && kind != 's'
+            && kind != 'b'
+            && kind != 'a'
+            && kind != 'c'
+        {
+            return Err(format!("unknown type prefix: {}", kind));
+        }
+
+        if kind == 's' {
+            return Ok(('s', 0));
+        }
+        if kind == 'b' {
+            return Ok(('b', 0));
+        }
+        if kind == 'c' {
+            return Ok(('c', 32));
+        }
+        if kind == 'a' {
+            return Ok(('a', 0));
+        }
+
+        let bits_str: String = chars.collect();
+        let bits = bits_str
+            .parse::<u32>()
+            .map_err(|_| format!("invalid type: {}", ty))?;
+        Ok((kind, bits))
+    }
+
+    fn truncate_to_width(value: i64, bits: u32) -> i64 {
+        if bits == 0 || bits >= 64 {
+            return value;
+        }
+        let mask = (1i64 << bits) - 1;
+        value & mask
+    }
+
     fn lower_expr_to_ir(
         e: &crate::syntax::Expr,
         out: &mut Vec<IrInstr>,
@@ -298,6 +346,10 @@ pub fn compile_project(
             Expr::Number(s) => {
                 let v = s.parse::<i64>().map_err(|_| "invalid number")?;
                 out.push(IrInstr::PushConst(v));
+                Ok(())
+            }
+            Expr::Float(f) => {
+                out.push(IrInstr::PushConstF(*f));
                 Ok(())
             }
             Expr::Bool(b) => {
@@ -342,9 +394,15 @@ pub fn compile_project(
                 use crate::syntax::BinOp::*;
                 match op {
                     Add | Sub | Mul | Div => {
+                        let is_float = matches!(left.as_ref(), Expr::Float(_))
+                            || matches!(right.as_ref(), Expr::Float(_));
                         lower_expr_to_ir(left, out, locals, next_local, next_label)?;
                         lower_expr_to_ir(right, out, locals, next_local, next_label)?;
-                        out.push(IrInstr::BinOp(op.clone()));
+                        if is_float {
+                            out.push(IrInstr::FloatBinOp(op.clone()));
+                        } else {
+                            out.push(IrInstr::BinOp(op.clone()));
+                        }
                         Ok(())
                     }
                     Eq | Ne | Lt | Le | Gt | Ge => {
@@ -431,7 +489,14 @@ pub fn compile_project(
 
                         lower_expr_to_ir(left, out, locals, next_local, next_label)?;
                         lower_expr_to_ir(right, out, locals, next_local, next_label)?;
-                        out.push(IrInstr::Compare(op.clone()));
+
+                        let is_float = matches!(left.as_ref(), Expr::Float(_))
+                            || matches!(right.as_ref(), Expr::Float(_));
+                        if is_float {
+                            out.push(IrInstr::FloatCompare(op.clone()));
+                        } else {
+                            out.push(IrInstr::Compare(op.clone()));
+                        }
                         Ok(())
                     }
                     And => {
@@ -520,6 +585,12 @@ pub fn compile_project(
                 };
                 if let Some(ty) = ty {
                     types.insert(name.clone(), ty.clone());
+
+                    if let Ok((_, bits)) = parse_type_width(ty) {
+                        if bits > 0 && bits < 64 {
+                            res.push(IrInstr::Truncate(bits));
+                        }
+                    }
                 }
                 res.push(IrInstr::StoreLocal(idx));
                 Ok(res)
@@ -609,6 +680,11 @@ pub fn compile_project(
                             if i < placeholders {
                                 let arg_expr = &args[i + 1];
 
+                                if let Expr::Float(f) = arg_expr {
+                                    res.push(IrInstr::EmitString(format!("{}", f)));
+                                    continue;
+                                }
+
                                 if let Some(v) = eval_const_integer(arg_expr) {
                                     res.push(IrInstr::EmitString(format!("{}", v)));
                                     continue;
@@ -641,11 +717,49 @@ pub fn compile_project(
                                         continue;
                                     }
 
+                                    if let Some(ty) = types.get(id) {
+                                        if ty.starts_with('f') && ty[1..].parse::<u32>().is_ok() {
+                                            lower_expr_to_ir(
+                                                arg_expr, &mut res, locals, next_local, next_label,
+                                            )?;
+
+                                            res.push(IrInstr::EmitInt);
+                                            continue;
+                                        }
+                                    }
+
                                     lower_expr_to_ir(
                                         arg_expr, &mut res, locals, next_local, next_label,
                                     )?;
                                     res.push(IrInstr::EmitInt);
                                     continue;
+                                }
+
+                                if let Expr::Binary { left, op, right } = arg_expr {
+                                    let is_float = matches!(left.as_ref(), Expr::Float(_))
+                                        || matches!(right.as_ref(), Expr::Float(_));
+                                    if is_float {
+                                        if let (Expr::Float(l), Expr::Float(r)) =
+                                            (left.as_ref(), right.as_ref())
+                                        {
+                                            let result = match op {
+                                                crate::syntax::BinOp::Add => l + r,
+                                                crate::syntax::BinOp::Sub => l - r,
+                                                crate::syntax::BinOp::Mul => l * r,
+                                                crate::syntax::BinOp::Div => l / r,
+                                                _ => {
+                                                    lower_expr_to_ir(
+                                                        arg_expr, &mut res, locals, next_local,
+                                                        next_label,
+                                                    )?;
+                                                    res.push(IrInstr::EmitInt);
+                                                    continue;
+                                                }
+                                            };
+                                            res.push(IrInstr::EmitString(format!("{}", result)));
+                                            continue;
+                                        }
+                                    }
                                 }
 
                                 if let Expr::Index {
@@ -1438,6 +1552,11 @@ pub fn compile_project(
                 text.write_u64::<LittleEndian>(v as u64).unwrap();
                 text.push(0x50);
             }
+            IrInstr::PushConstF(f) => {
+                text.extend_from_slice(&[0x48, 0xB8]);
+                text.write_u64::<LittleEndian>(f.to_bits()).unwrap();
+                text.push(0x50);
+            }
             IrInstr::StoreLocal(idx) => {
                 text.push(0x58);
 
@@ -1519,8 +1638,30 @@ pub fn compile_project(
                     _is_call: false,
                 });
             }
+            IrInstr::EmitFloat => {
+                return Err("EmitFloat not yet implemented".into());
+            }
             IrInstr::Pop => {
                 text.push(0x58);
+            }
+            IrInstr::Truncate(bits) => {
+                text.push(0x58);
+
+                if bits == 0 || bits >= 64 {
+                } else if bits <= 16 {
+                    let mask = (1u32 << bits) - 1;
+                    text.extend_from_slice(&[0xB9]);
+                    text.write_u32::<LittleEndian>(mask).unwrap();
+                    text.extend_from_slice(&[0x48, 0x21, 0xC8]);
+                } else {
+                    let shift = 64 - bits;
+                    text.extend_from_slice(&[0x48, 0xC1, 0xE0]);
+                    text.push(shift as u8);
+                    text.extend_from_slice(&[0x48, 0xC1, 0xE8]);
+                    text.push(shift as u8);
+                }
+
+                text.push(0x50);
             }
             IrInstr::BinOp(op) => {
                 text.push(0x5B);
@@ -1543,6 +1684,33 @@ pub fn compile_project(
                 }
                 text.push(0x50);
             }
+            IrInstr::FloatBinOp(op) => {
+                text.push(0x5B);
+                text.push(0x58);
+
+                text.extend_from_slice(&[0x48, 0x0F, 0x6E, 0xC0]);
+
+                text.extend_from_slice(&[0x48, 0x0F, 0x6E, 0xCB]);
+
+                match op {
+                    crate::syntax::BinOp::Add => {
+                        text.extend_from_slice(&[0xF2, 0x0F, 0x58, 0xC1]);
+                    }
+                    crate::syntax::BinOp::Sub => {
+                        text.extend_from_slice(&[0xF2, 0x0F, 0x5C, 0xC1]);
+                    }
+                    crate::syntax::BinOp::Mul => {
+                        text.extend_from_slice(&[0xF2, 0x0F, 0x59, 0xC1]);
+                    }
+                    crate::syntax::BinOp::Div => {
+                        text.extend_from_slice(&[0xF2, 0x0F, 0x5E, 0xC1]);
+                    }
+                    _ => return Err("unsupported float binop".into()),
+                }
+
+                text.extend_from_slice(&[0x48, 0x0F, 0x7E, 0xC0]);
+                text.push(0x50);
+            }
             IrInstr::Compare(op) => {
                 text.push(0x5B);
                 text.push(0x58);
@@ -1560,6 +1728,28 @@ pub fn compile_project(
                 };
                 text.extend_from_slice(&[0x0F, set_opcode, 0xC0]);
 
+                text.extend_from_slice(&[0x48, 0x0F, 0xB6, 0xC0]);
+                text.push(0x50);
+            }
+            IrInstr::FloatCompare(op) => {
+                text.push(0x5B);
+                text.push(0x58);
+
+                text.extend_from_slice(&[0x48, 0x0F, 0x6E, 0xC0]);
+                text.extend_from_slice(&[0x48, 0x0F, 0x6E, 0xCB]);
+
+                text.extend_from_slice(&[0x66, 0x0F, 0x2F, 0xC1]);
+
+                let set_opcode = match op {
+                    crate::syntax::BinOp::Eq => 0x94u8,
+                    crate::syntax::BinOp::Ne => 0x95u8,
+                    crate::syntax::BinOp::Lt => 0x92u8,
+                    crate::syntax::BinOp::Le => 0x96u8,
+                    crate::syntax::BinOp::Gt => 0x9Fu8,
+                    crate::syntax::BinOp::Ge => 0x9Du8,
+                    _ => return Err("unsupported float comparison".into()),
+                };
+                text.extend_from_slice(&[0x0F, set_opcode, 0xC0]);
                 text.extend_from_slice(&[0x48, 0x0F, 0xB6, 0xC0]);
                 text.push(0x50);
             }

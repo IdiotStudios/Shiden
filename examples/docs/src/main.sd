@@ -32,9 +32,8 @@ fn new demo_types/
     let age = 25/i64
     println("i64: {}", age)/
 
-    let temp = 98/f64
+    let temp = 98.23/f64
     println("f64: {}", temp)/
-    println("floats are currently broken")/
 
     let name = "Shiden"/str
     println("str: {}", name)/

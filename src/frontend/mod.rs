@@ -823,8 +823,22 @@ impl<'a> Parser<'a> {
             }
             Token::Number(n) => {
                 let n = n.clone();
-                self.advance();
-                Ok(Expr::Number(n))
+
+                if n.contains('.') {
+                    match n.parse::<f64>() {
+                        Ok(f) => {
+                            self.advance();
+                            Ok(Expr::Float(f))
+                        }
+                        Err(_) => {
+                            self.advance();
+                            Err(format!("Invalid float literal: {}", n))
+                        }
+                    }
+                } else {
+                    self.advance();
+                    Ok(Expr::Number(n))
+                }
             }
             Token::LBracket => {
                 self.advance();
