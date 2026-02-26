@@ -1,0 +1,40 @@
+fn new print_header(title/str)/unit
+    println("")/unit
+    println("=== {} ===", title)/unit
+fn/
+
+fn new main/
+    println("FTPDB API Example")/unit
+    println("Fetching data from https://ftpdb.fyi/api")/unit
+
+    print_header("Project Info: Shiden")/unit
+    let project = ftpdb get("Shiden")/str
+    println("Response: {}", project)/unit
+
+    print_header("Hot Projects (Trending)")/unit
+    let hot = ftpdb hot()/str
+    println("Response: {}", hot)/unit
+
+    print_header("Top Projects This Week")/unit
+    let weekly = ftpdb top_week()/str
+    println("Response: {}", weekly)/unit
+
+    print_header("Fan Favourite Projects")/unit
+    let favorites = ftpdb fan_favourites()/str
+    println("Response: {}", favorites)/unit
+
+    print_header("Top Projects All Time")/unit
+    let alltime = ftpdb top_all_time()/str
+    println("Response: {}", alltime)/unit
+
+    print_header("Random Devlogs")/unit
+    let devlogs = ftpdb random_devlogs()/str
+    println("Response: {}", devlogs)/unit
+
+    print_header("Top Contributors")/unit
+    let contributors = ftpdb most_time_spent()/str
+    println("Response: {}", contributors)/unit
+
+    println("")/unit
+    println("Example completed!")/unit
+fn/
