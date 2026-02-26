@@ -1,6 +1,7 @@
 # Shiden — Types
 
 Types are postfix tokens written as `/<type>`.
+They are required on `let` statements and in function signatures.
 
 For working examples of all types, see `examples/docs/src/main.sd`.
 
@@ -57,7 +58,8 @@ let nums = [1, 2, 3]/array
 
 `unit` represents no value and is used for effect-only calls.
 Functions that return nothing usually end with `/unit`.
+You can also just do `/` instead of `/unit`.
 
 ```shiden
-println("ok")/unit
+println("ok")/
 ```

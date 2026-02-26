@@ -13,11 +13,11 @@ let mut total = 0/i64
 
 ## Assignment
 
-Assignments end with `/` or `/<type>`.
-Typed assignments are allowed when you want an explicit type check.
+Assignments end with `/`.
+Use `let` to introduce a type, then reassign without a suffix.
 
 ```shiden
-total = total + 1/i64
+total = total + 1/
 ```
 
 ## Index assignment
@@ -27,5 +27,5 @@ Indices are zero-based and must be integer expressions.
 
 ```shiden
 let nums = [1, 2, 3]/array
-nums[1] = 9/i64
+nums[1] = 9/
 ```

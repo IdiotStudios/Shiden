@@ -1,40 +1,40 @@
-fn new print_header(title/str)/unit
-    println("")/unit
-    println("=== {} ===", title)/unit
+fn new print_header(title)/
+    println("")/
+    println("=== {} ===", title)/
 fn/
 
 fn new main/
-    println("FTPDB API Example")/unit
-    println("Fetching data from https://ftpdb.fyi/api")/unit
+    println("FTPDB API Example")/
+    println("Fetching data from https://ftpdb.fyi/api")/
 
-    print_header("Project Info: Shiden")/unit
+    print_header("Project Info: Shiden")/
     let project = ftpdb get("Shiden")/str
-    println("Response: {}", project)/unit
+    println("Response: {}", project)/
 
-    print_header("Hot Projects (Trending)")/unit
+    print_header("Hot Projects (Trending)")/
     let hot = ftpdb hot()/str
-    println("Response: {}", hot)/unit
+    println("Response: {}", hot)/
 
-    print_header("Top Projects This Week")/unit
+    print_header("Top Projects This Week")/
     let weekly = ftpdb top_week()/str
-    println("Response: {}", weekly)/unit
+    println("Response: {}", weekly)/
 
-    print_header("Fan Favourite Projects")/unit
+    print_header("Fan Favourite Projects")/
     let favorites = ftpdb fan_favourites()/str
-    println("Response: {}", favorites)/unit
+    println("Response: {}", favorites)/
 
-    print_header("Top Projects All Time")/unit
+    print_header("Top Projects All Time")/
     let alltime = ftpdb top_all_time()/str
-    println("Response: {}", alltime)/unit
+    println("Response: {}", alltime)/
 
-    print_header("Random Devlogs")/unit
+    print_header("Random Devlogs")/
     let devlogs = ftpdb random_devlogs()/str
-    println("Response: {}", devlogs)/unit
+    println("Response: {}", devlogs)/
 
-    print_header("Top Contributors")/unit
+    print_header("Top Contributors")/
     let contributors = ftpdb most_time_spent()/str
-    println("Response: {}", contributors)/unit
+    println("Response: {}", contributors)/
 
-    println("")/unit
-    println("Example completed!")/unit
+    println("")/
+    println("Example completed!")/
 fn/

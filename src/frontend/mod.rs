@@ -174,14 +174,7 @@ impl<'a> Parser<'a> {
                 if let Token::Identifier(id) = &self.cur {
                     let name = id.clone();
                     self.advance();
-
-                    if let Token::Type(t) = &self.cur {
-                        let ptype = t.clone();
-                        self.advance();
-                        params.push((name, Some(ptype)));
-                    } else {
-                        params.push((name, None));
-                    }
+                    params.push((name, None));
                 }
                 if let Token::Comma = &self.cur {
                     self.advance();
@@ -196,18 +189,14 @@ impl<'a> Parser<'a> {
             }
         }
 
-        let mut ret_type: Option<String> = None;
+        let ret_type: Option<String> = None;
         match &self.cur {
             Token::Slash => {
                 self.advance();
             }
-            Token::Type(t) => {
-                ret_type = Some(t.clone());
-                self.advance();
-            }
             other => {
                 return Err(format!(
-                    "expected '/' or '/<type>' after function header, got: {:?}",
+                    "expected '/' after function header, got: {:?}",
                     other
                 ));
             }
@@ -272,24 +261,16 @@ impl<'a> Parser<'a> {
             Token::Return => {
                 self.advance();
                 let expr = self.parse_expr()?;
-                let ty = if let Token::Type(t) = &self.cur {
-                    let s = t.clone();
+                if let Token::Slash = &self.cur {
                     self.advance();
-                    Some(s)
-                } else if let Token::Slash = &self.cur {
-                    self.advance();
-                    None
+                    Ok(Some(Stmt::Return(expr, None)))
                 } else {
-                    return Err("expected '/' or '/<type>' after return".into());
-                };
-                Ok(Some(Stmt::Return(expr, ty)))
+                    Err("expected '/' after return".into())
+                }
             }
             Token::Break => {
                 self.advance();
-                if let Token::Type(_t) = &self.cur {
-                    self.advance();
-                    Ok(Some(Stmt::Break))
-                } else if let Token::Slash = &self.cur {
+                if let Token::Slash = &self.cur {
                     self.advance();
                     Ok(Some(Stmt::Break))
                 } else {
@@ -298,10 +279,7 @@ impl<'a> Parser<'a> {
             }
             Token::Continue => {
                 self.advance();
-                if let Token::Type(_t) = &self.cur {
-                    self.advance();
-                    Ok(Some(Stmt::Continue))
-                } else if let Token::Slash = &self.cur {
+                if let Token::Slash = &self.cur {
                     self.advance();
                     Ok(Some(Stmt::Continue))
                 } else {
@@ -323,10 +301,6 @@ impl<'a> Parser<'a> {
                     return Err("expected 'in' after for variable".into());
                 }
                 let iterable = self.parse_expr()?;
-
-                if let Token::Type(_t) = &self.cur {
-                    self.advance();
-                }
                 if let Token::Slash = &self.cur {
                     self.advance();
                 } else {
@@ -360,10 +334,6 @@ impl<'a> Parser<'a> {
             Token::If => {
                 self.advance();
                 let cond = self.parse_expr()?;
-
-                if let Token::Type(_t) = &self.cur {
-                    self.advance();
-                }
                 if let Token::Slash = &self.cur {
                     self.advance();
                 } else {
@@ -420,10 +390,6 @@ impl<'a> Parser<'a> {
             Token::While => {
                 self.advance();
                 let cond = self.parse_expr()?;
-
-                if let Token::Type(_t) = &self.cur {
-                    self.advance();
-                }
                 if let Token::Slash = &self.cur {
                     self.advance();
                 } else {
@@ -466,14 +432,7 @@ impl<'a> Parser<'a> {
                         if let Token::Equal = &self.cur {
                             self.advance();
                             let expr = self.parse_expr()?;
-                            if let Token::Type(_t) = &self.cur {
-                                self.advance();
-                                return Ok(Some(Stmt::AssignIndex {
-                                    name,
-                                    index: idx,
-                                    value: expr,
-                                }));
-                            } else if let Token::Slash = &self.cur {
+                            if let Token::Slash = &self.cur {
                                 self.advance();
                                 return Ok(Some(Stmt::AssignIndex {
                                     name,
@@ -489,10 +448,7 @@ impl<'a> Parser<'a> {
                         self.advance();
                         self.advance();
                         let expr = self.parse_expr()?;
-                        if let Token::Type(_t) = &self.cur {
-                            self.advance();
-                            return Ok(Some(Stmt::Assign { name, value: expr }));
-                        } else if let Token::Slash = &self.cur {
+                        if let Token::Slash = &self.cur {
                             self.advance();
                             return Ok(Some(Stmt::Assign { name, value: expr }));
                         } else {
@@ -502,10 +458,7 @@ impl<'a> Parser<'a> {
                 }
 
                 let expr = self.parse_expr()?;
-                if let Token::Type(_t) = &self.cur {
-                    self.advance();
-                    Ok(Some(Stmt::Expr(expr)))
-                } else if let Token::Slash = &self.cur {
+                if let Token::Slash = &self.cur {
                     self.advance();
                     Ok(Some(Stmt::Expr(expr)))
                 } else {
@@ -514,10 +467,7 @@ impl<'a> Parser<'a> {
             }
             Token::StringLiteral(_) => {
                 let expr = self.parse_expr()?;
-                if let Token::Type(_t) = &self.cur {
-                    self.advance();
-                    Ok(Some(Stmt::Expr(expr)))
-                } else if let Token::Slash = &self.cur {
+                if let Token::Slash = &self.cur {
                     self.advance();
                     Ok(Some(Stmt::Expr(expr)))
                 } else {
@@ -925,7 +875,8 @@ mod tests {
 
     #[test]
     fn parse_function_with_let_and_call() {
-        let src = "fn new greet/\n    let name = \"Nayte\"/str\n    println(\"Hello {}\", name)/unit\nfn/";
+        let src =
+            "fn new greet/\n    let name = \"Nayte\"/str\n    println(\"Hello {}\", name)/\nfn/";
         let res = parse(src).expect("parse failed");
         assert_eq!(res.items.len(), 1);
         match &res.items[0] {
@@ -942,7 +893,7 @@ mod tests {
 
     #[test]
     fn parse_function_with_params() {
-        let src = "fn new add(a/i64, b/i64)/\n    println(\"{} {}\", a, b)/unit\nfn/";
+        let src = "fn new add(a, b)/\n    println(\"{} {}\", a, b)/\nfn/";
         let res = parse(src).expect("parse failed");
         match &res.items[0] {
             Item::Function {
@@ -951,10 +902,7 @@ mod tests {
                 assert_eq!(name, "add");
                 assert_eq!(
                     params,
-                    &vec![
-                        ("a".to_string(), Some("i64".to_string())),
-                        ("b".to_string(), Some("i64".to_string()))
-                    ]
+                    &vec![("a".to_string(), None), ("b".to_string(), None)]
                 );
                 assert_eq!(body.len(), 1);
             }
@@ -964,7 +912,7 @@ mod tests {
 
     #[test]
     fn parse_if_else() {
-        let src = "fn new main/\n    if 1 == 1/\n        println(\"yes\")/unit\n    else/\n        println(\"no\")/unit\n    if/\nfn/";
+        let src = "fn new main/\n    if 1 == 1/\n        println(\"yes\")/\n    else/\n        println(\"no\")/\n    if/\nfn/";
         let res = parse(src).expect("parse failed");
         match &res.items[0] {
             Item::Function { name, body, .. } => {
@@ -977,7 +925,7 @@ mod tests {
 
     #[test]
     fn parse_while_simple() {
-        let src = "fn new main/\n    let mut x = 0/i64\n    while x < 3/\n        x = x + 1/i64\n    while/\n    println(\"{}\", x)/unit\nfn/";
+        let src = "fn new main/\n    let mut x = 0/i64\n    while x < 3/\n        x = x + 1/\n    while/\n    println(\"{}\", x)/\nfn/";
         let res = parse(src).expect("parse failed");
         match &res.items[0] {
             Item::Function { name, body, .. } => {
@@ -1023,7 +971,7 @@ mod tests {
 
     #[test]
     fn parse_float_lets() {
-        let src = "fn new main/\n    let x = 1.5/f64\n    let y = 2.0/f64\n    println(\"{}\", x + y)/unit\nfn/";
+        let src = "fn new main/\n    let x = 1.5/f64\n    let y = 2.0/f64\n    println(\"{}\", x + y)/\nfn/";
         let res = parse(src).expect("parse failed");
         match &res.items[0] {
             Item::Function { body, .. } => {
@@ -1035,7 +983,7 @@ mod tests {
 
     #[test]
     fn parse_array_and_index() {
-        let src = "fn new main/\n    let a = [1, 2, 3]/array\n    println(\"{}\", a[1])/unit\nfn/";
+        let src = "fn new main/\n    let a = [1, 2, 3]/array\n    println(\"{}\", a[1])/\nfn/";
         let res = parse(src).expect("parse failed");
         match &res.items[0] {
             Item::Function { body, .. } => {

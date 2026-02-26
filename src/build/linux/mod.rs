@@ -186,7 +186,7 @@ mod tests {
         fs::create_dir_all(pd.join("src")).expect("mkdir");
         fs::write(
             pd.join("src/main.sd"),
-            "fn new main/\n    println(\"hello\")/unit\nfn/",
+            "fn new main/\n    println(\"hello\")/\nfn/",
         )
         .expect("write src");
         fs::write(
@@ -232,7 +232,7 @@ mod tests {
         fs::create_dir_all(pd.join("src")).expect("mkdir");
         fs::write(
             pd.join("src/main.sd"),
-            "fn new main/\n    println(\"sum {} {}\", 2+3, 4)/unit\nfn/",
+            "fn new main/\n    println(\"sum {} {}\", 2+3, 4)/\nfn/",
         )
         .expect("write src");
         fs::write(
@@ -252,7 +252,7 @@ mod tests {
         let td = tempdir().expect("tempdir");
         let pd = td.path();
         fs::create_dir_all(pd.join("src")).expect("mkdir");
-        fs::write(pd.join("src/main.sd"), "fn new main/\n    let x = 2/i64\n    let y = 3/i64\n    println(\"sum {}\", x + y)/unit\nfn/").expect("write src");
+        fs::write(pd.join("src/main.sd"), "fn new main/\n    let x = 2/i64\n    let y = 3/i64\n    println(\"sum {}\", x + y)/\nfn/").expect("write src");
         fs::write(
             pd.join("shiden.toml"),
             r#"[project]\nname = "test"\n[build]\ntargets = ["x86_64-linux"]"#,
@@ -276,7 +276,7 @@ mod tests {
         let td = tempdir().expect("tempdir");
         let pd = td.path();
         fs::create_dir_all(pd.join("src")).expect("mkdir");
-        fs::write(pd.join("src/main.sd"), "fn new main/\n    let x = 42/i64\n    println(\"after {}\", x)/unit\n    println(\"both {} {}\", 42, x)/unit\nfn/").expect("write src");
+        fs::write(pd.join("src/main.sd"), "fn new main/\n    let x = 42/i64\n    println(\"after {}\", x)/\n    println(\"both {} {}\", 42, x)/\nfn/").expect("write src");
         fs::write(
             pd.join("shiden.toml"),
             r#"[project]\nname = "test"\n[build]\ntargets = ["x86_64-linux"]"#,
@@ -311,7 +311,7 @@ mod tests {
         let td = tempdir().expect("tempdir");
         let pd = td.path();
         fs::create_dir_all(pd.join("src")).expect("mkdir");
-        fs::write(pd.join("src/main.sd"), "fn new main/\n    if 1 == 1/\n        println(\"yes\")/unit\n    else/\n        println(\"no\")/unit\n    if/\n    println(\"after\")/unit\nfn/").expect("write src");
+        fs::write(pd.join("src/main.sd"), "fn new main/\n    if 1 == 1/\n        println(\"yes\")/\n    else/\n        println(\"no\")/\n    if/\n    println(\"after\")/\nfn/").expect("write src");
         fs::write(
             pd.join("shiden.toml"),
             r#"[project]\nname = "test"\n[build]\ntargets = ["x86_64-linux"]"#,
@@ -329,7 +329,7 @@ mod tests {
         let td = tempdir().expect("tempdir");
         let pd = td.path();
         fs::create_dir_all(pd.join("src")).expect("mkdir");
-        fs::write(pd.join("src/main.sd"), "fn new main/\n    let i = 0/i64\n    while i < 3/\n        println(\"{}\", i)/unit\n        i = i + 1/i64\n    while/\n    println(\"done\")/unit\nfn/").expect("write src");
+        fs::write(pd.join("src/main.sd"), "fn new main/\n    let i = 0/i64\n    while i < 3/\n        println(\"{}\", i)/\n        i = i + 1/\n    while/\n    println(\"done\")/\nfn/").expect("write src");
         fs::write(
             pd.join("shiden.toml"),
             r#"[project]\nname = "test"\n[build]\ntargets = ["x86_64-linux"]"#,
@@ -349,7 +349,7 @@ mod tests {
         fs::create_dir_all(pd.join("src")).expect("mkdir");
         fs::write(
             pd.join("src/main.sd"),
-            "fn new main/\n    println(\"res {}\", 0 == 1 && (1 / 0))/unit\nfn/",
+            "fn new main/\n    println(\"res {}\", 0 == 1 && (1 / 0))/\nfn/",
         )
         .expect("write src");
         fs::write(
@@ -371,7 +371,7 @@ mod tests {
         fs::create_dir_all(pd.join("src")).expect("mkdir");
         fs::write(
             pd.join("src/main.sd"),
-            "fn new main/\n    println(\"res {}\", 1 == 1 || (1 / 0))/unit\nfn/",
+            "fn new main/\n    println(\"res {}\", 1 == 1 || (1 / 0))/\nfn/",
         )
         .expect("write src");
         fs::write(
@@ -391,7 +391,7 @@ mod tests {
         let td = tempdir().expect("tempdir");
         let pd = td.path();
         fs::create_dir_all(pd.join("src")).expect("mkdir");
-        fs::write(pd.join("src/main.sd"), "fn new add(a/i64, b/i64)/\n    return a + b/\nfn/\nfn new main/\n    println(\"{}\", add(2, 3))/unit\nfn/").expect("write src");
+        fs::write(pd.join("src/main.sd"), "fn new add(a, b)/\n    return a + b/\nfn/\nfn new main/\n    println(\"{}\", add(2, 3))/\nfn/").expect("write src");
         fs::write(
             pd.join("shiden.toml"),
             r#"[project]\nname = "test"\n[build]\ntargets = ["x86_64-linux"]"#,
@@ -421,7 +421,7 @@ mod tests {
         let td = tempdir().expect("tempdir");
         let pd = td.path();
         fs::create_dir_all(pd.join("src")).expect("mkdir");
-        fs::write(pd.join("src/main.sd"), "fn new add(a/i64, b/i64)/\n    println(\"in add\")/unit\n    return a + b/\nfn/\nfn new main/\n    println(\"before\")/unit\n    let _ = add(2, 3)/unit\n    println(\"after\")/unit\n    println(\"exit_main\")/unit\nfn/").expect("write src");
+        fs::write(pd.join("src/main.sd"), "fn new add(a, b)/\n    println(\"in add\")/\n    return a + b/\nfn/\nfn new main/\n    println(\"before\")/\n    let _ = add(2, 3)/i64\n    println(\"after\")/\n    println(\"exit_main\")/\nfn/").expect("write src");
         fs::write(
             pd.join("shiden.toml"),
             r#"[project]\nname = "test"\n[build]\ntargets = ["x86_64-linux"]"#,
@@ -454,7 +454,7 @@ mod tests {
         let pd = td.path();
         fs::create_dir_all(pd.join("src")).expect("mkdir");
 
-        fs::write(pd.join("src/main.sd"), "fn new add(a/i64, b/i64, c/i64, d/i64, e/i64, f/i64, g/i64, h/i64)/\n    println(\"args {} {} {} {} {} {} {} {}\", a, b, c, d, e, f, g, h)/unit\n    return a + b + c + d + e + f + g + h/\nfn/\nfn new main/\n    println(\"{}\", add(1,2,3,4,5,6,7,8))/unit\nfn/").expect("write src");
+        fs::write(pd.join("src/main.sd"), "fn new add(a, b, c, d, e, f, g, h)/\n    println(\"args {} {} {} {} {} {} {} {}\", a, b, c, d, e, f, g, h)/\n    return a + b + c + d + e + f + g + h/\nfn/\nfn new main/\n    println(\"{}\", add(1,2,3,4,5,6,7,8))/\nfn/").expect("write src");
         fs::write(
             pd.join("shiden.toml"),
             r#"[project]\nname = "test"\n[build]\ntargets = ["x86_64-linux"]"#,
@@ -485,7 +485,7 @@ mod tests {
         fs::create_dir_all(pd.join("src")).expect("mkdir");
         fs::write(
             pd.join("src/main.sd"),
-            "fn new main/\n    let mut a = []/array\n    push(a, 'H')/unit\n    push(a, 'i')/unit\n    println(\"{} {}\", a[0], a[1])/unit\nfn/",
+            "fn new main/\n    let mut a = []/array\n    push(a, 'H')/\n    push(a, 'i')/\n    println(\"{} {}\", a[0], a[1])/\nfn/",
         )
         .expect("write src");
         fs::write(
@@ -524,7 +524,7 @@ mod tests {
         fs::create_dir_all(pd.join("src")).expect("mkdir");
         fs::write(
             pd.join("src/main.sd"),
-            "fn new main/\n    let mut a = []/array\n    push(a, 1)/unit\n    a[0] = 42/i64\n    println(\"{}\", a[0])/unit\nfn/",
+            "fn new main/\n    let mut a = []/array\n    push(a, 1)/\n    a[0] = 42/\n    println(\"{}\", a[0])/\nfn/",
         )
         .expect("write src");
         fs::write(

@@ -18,7 +18,7 @@ Indexing can be applied to variables or call results.
 
 ```shiden
 let nums = [4, 5, 6]/array
-println("{}", nums[1])/unit
+println("{}", nums[1])/
 ```
 
 ## Grouping and unary

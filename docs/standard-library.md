@@ -10,7 +10,7 @@ These are wrappers over built-in runtime helpers with stable names.
 ```shiden
 fn new main/
     let data = fs read("/tmp/a")/str
-    fs write("/tmp/b", data)/unit
+    fs write("/tmp/b", data)/
 fn/
 ```
 
@@ -22,6 +22,6 @@ Networking APIs are synchronous and return `str` or `i64` handles.
 ```shiden
 fn new main/
     let body = net http get("https://example.com")/str
-    println("{}", body)/unit
+    println("{}", body)/
 fn/
 ```

@@ -482,7 +482,7 @@ mod tests {
         fs::create_dir_all(pd.join("src")).expect("mkdir");
         fs::write(
             pd.join("src/main.sd"),
-            "fn new main/\n    println(\"hi\")/unit\nfn/",
+            "fn new main/\n    println(\"hi\")/\nfn/",
         )
         .expect("write src");
         fs::write(
@@ -508,7 +508,7 @@ mod tests {
         fs::create_dir_all(pd.join("src")).expect("mkdir");
         fs::write(
             pd.join("src/main.sd"),
-            "fn new main/\n    let _ = args()/array\n    println(\"ok\")/unit\nfn/",
+            "fn new main/\n    let _ = args()/array\n    println(\"ok\")/\nfn/",
         )
         .expect("write src");
         fs::write(
@@ -569,7 +569,7 @@ mod tests {
         fs::create_dir_all(pd.join("src")).expect("mkdir");
         fs::write(
             pd.join("src/main.sd"),
-            "fn new main/\n    println(\"bye\")/unit\nfn/",
+            "fn new main/\n    println(\"bye\")/\nfn/",
         )
         .expect("write src");
         fs::write(
@@ -670,7 +670,7 @@ mod run_tests {
         fs::create_dir_all(pd.join("src")).expect("mkdir");
         fs::write(
             pd.join("src/main.sd"),
-            "fn new main/\n    println(\"hello\")/unit\nfn/",
+            "fn new main/\n    println(\"hello\")/\nfn/",
         )
         .expect("write src");
         fs::write(
@@ -692,7 +692,7 @@ mod run_tests {
         std::fs::create_dir_all(pd.join("src")).expect("mkdir");
         std::fs::write(
             pd.join("src/main.sd"),
-            "fn new main/\n    println(\"args {} {}\", args()[0], args()[1])/unit\nfn/",
+            "fn new main/\n    println(\"args {} {}\", args()[0], args()[1])/\nfn/",
         )
         .expect("write src");
         std::fs::write(

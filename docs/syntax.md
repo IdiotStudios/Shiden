@@ -19,12 +19,12 @@ fn/
 
 ## Statement terminators
 
-Every statement ends with `/` or `/<type>`.
-This keeps parsing deterministic without semicolons or braces.
+Every statement ends with `/`.
+Only `let` statements attach a `/<type>` suffix for type binding.
 
 ```shiden
 let msg = "hi"/str
-println("{}", msg)/unit
+println("{}", msg)/
 ```
 
 ## Function blocks
@@ -33,8 +33,8 @@ Functions open with `fn new` and close with `fn/`.
 The close marker is required even for single-line bodies.
 
 ```shiden
-fn new greet(name/str)/
-    println("Hello {}", name)/unit
+fn new greet(name)/
+    println("Hello {}", name)/
 fn/
 ```
 
@@ -47,6 +47,6 @@ The alias becomes a prefix for module functions.
 let "filesystem" = fs/import
 
 fn new main/
-    println("{}", fs_read("/tmp/a"))/unit
+    println("{}", fs_read("/tmp/a"))/
 fn/
 ```

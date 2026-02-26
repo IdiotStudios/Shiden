@@ -2,28 +2,28 @@ fn new demonstrate_spacing/
     let x = 1 + 2/i64
     let y = 3 * 4/i64
     let z = x + y/i64
-    return z/i64
+    return z/
 fn/
 
 fn new demonstrate_indentation/
     if true/
-        println("Properly indented")/unit
+        println("Properly indented")/
         if false/
-            println("Nested indentation")/unit
+            println("Nested indentation")/
         if/
     if/
 fn/
 
 fn new demonstrate_function_calls/
-    println("No space before parentheses")/unit
-    add(1, 2)/i64
-    multiply(3, 4, 5)/i64
+    println("No space before parentheses")/
+    add(1, 2)/
+    multiply(3, 4, 5)/
 fn/
 
-fn new add(a/i64, b/i64)/i64
-    return a + b/i64
+fn new add(a, b)/
+    return a + b/
 fn/
 
-fn new multiply(a/i64, b/i64, c/i64)/i64
-    return a * b * c/i64
+fn new multiply(a, b, c)/
+    return a * b * c/
 fn/

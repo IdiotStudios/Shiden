@@ -20,6 +20,6 @@ Aliases are plain identifiers and can be used in multiple files.
 let "brainfuck" = "bf"/import
 
 fn new main/
-    bf_run("+[]")/unit
+    bf_run("+[]")/
 fn/
 ```

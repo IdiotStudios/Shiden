@@ -462,7 +462,8 @@ mod tests {
 
     #[test]
     fn lex_function_example() {
-        let input = "fn new greet/\n    let name = \"Nayte\"/str\n    println(\"Hello {}\", name)/unit\nfn/";
+        let input =
+            "fn new greet/\n    let name = \"Nayte\"/str\n    println(\"Hello {}\", name)/\nfn/";
         let mut lx = Lexer::new(input);
         let mut toks = Vec::new();
         loop {
@@ -537,7 +538,7 @@ mod tests {
 
     #[test]
     fn lex_println_unit_has_type() {
-        let input = "println(\"hi\")/unit\n";
+        let input = "println(\"hi\")/\n";
         let mut lx = Lexer::new(input);
         let mut toks = Vec::new();
         loop {
@@ -549,7 +550,7 @@ mod tests {
         }
 
         assert!(toks.iter().any(|s| s.contains("RParen")));
-        assert!(toks.iter().any(|s| s.contains("Type(\"unit\")")));
+        assert!(toks.iter().any(|s| s.contains("Slash")));
     }
 
     #[test]

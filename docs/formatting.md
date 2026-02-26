@@ -33,13 +33,14 @@ No space between the function name and the opening parenthesis.
 Arguments are separated by commas followed by a single space.
 
 ```shiden
-println("hello")/unit
-add(1, 2)/i64
+println("hello")/
+add(1, 2)/
 ```
 
 ## Line breaks and statements
 
-Each statement ends with `/` or `/<type>` and is on its own line.
+Each statement ends with `/` and is on its own line.
+Only `let` statements use `/<type>` for type binding.
 Long lines can be split before operators or between arguments.
 
 ```shiden
@@ -58,11 +59,11 @@ However if you do not do this it will still compile.
 let "fs" = fs/import
 
 fn new helper/
-    println("hi")/unit
+    println("hi")/
 fn/
 
 fn new main/
-    helper()/unit
+    helper()/
 fn/
 ```
 

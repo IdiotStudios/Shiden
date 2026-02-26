@@ -12,9 +12,9 @@ The `else/` block is optional and must appear before the closing `if/`.
 ```shiden
 fn new main/
     if 1 == 1/
-        println("yes")/unit
+        println("yes")/
     else/
-        println("no")/unit
+        println("no")/
     if/
 fn/
 ```
@@ -41,7 +41,7 @@ The loop variable is a new binding scoped to the loop body.
 ```shiden
 fn new main/
     for n in [1, 2, 3]/
-        println("{}", n)/unit
+        println("{}", n)/
     for/
 fn/
 ```
@@ -49,7 +49,7 @@ fn/
 ## break and continue
 
 `break/` exits a loop and `continue/` skips to the next iteration.
-Both are statements and can be written with or without a type suffix.
+Both are statements and end with `/`.
 
 ```shiden
 fn new main/
@@ -68,11 +68,11 @@ fn/
 
 ## return
 
-`return` ends a function and can include a typed expression.
-Use `/` after `return` to indicate `unit`.
+`return` ends a function and can include an expression.
+The statement ends with `/` like any other non-let statement.
 
 ```shiden
-fn new id(x/i64)/i64
-    return x/i64
+fn new id(x)/
+    return x/
 fn/
 ```

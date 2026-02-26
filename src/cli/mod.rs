@@ -622,7 +622,7 @@ targets = ["x86_64-linux", "x86_64-windows"]"#;
         std::fs::create_dir_all(pd.join("src")).expect("create src");
         std::fs::write(
             pd.join("src/main.sd"),
-            "fn new main/\n    println(\"hi\")/unit\nfn/",
+            "fn new main/\n    println(\"hi\")/\nfn/",
         )
         .expect("write main");
 
