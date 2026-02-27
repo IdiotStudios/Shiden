@@ -8,8 +8,10 @@ Welcome to the Shiden docs — concise reference and quick start for the Shiden 
 - **Compiler**: Ahead-of-time compilation pipeline (AST → IR → object → exe) — see `docs/build.md`
 - **Frontend (parser)**: `parse(src: &str) -> Result<Program, String>` — produces the AST
 - **Language**: syntax (`docs/syntax.md`), types (`docs/types.md`), variables (`docs/variables.md`), functions (`docs/functions.md`), expressions (`docs/expressions.md`), control flow (`docs/control-flow.md`), modules (`docs/modules.md`)
+- **Numeric types**: integers with generic bit-widths (i1-i128, u1-u128) and floating-point support (f16, f32, f64, f80, f128) — see `docs/types.md` and `docs/floats.md`
 - **Format**: `check_format` — source style rules (see `docs/format.md` and `docs/formatting.md`)
 - **Standard library**: filesystem and networking helpers (`docs/standard-library.md`)
+- **Timing**: high-resolution platform-specific timers for compile and execution times (`docs/timing.md`)
 
 ## Quick start
 
@@ -19,12 +21,12 @@ Welcome to the Shiden docs — concise reference and quick start for the Shiden 
 
 ## Examples
 
-Check out `examples/docs/` for a complete project demonstrating all language features covered in this documentation. Run it with:
+Check out `examples/types/` for a comprehensive demonstration of all 267+ supported types. Run it with:
 
 ```bash
-cargo run -- run examples/docs/
+cargo run -- run examples/types/
 ```
 
-Other examples are `examples/HelloWorld/`, `examples/brainfuck/`, and `examples/http server/`.
+For complete language feature examples, see `examples/docs/`. Other examples are `examples/HelloWorld/`, `examples/brainfuck/`, and `examples/http server/`.
 
 ---
