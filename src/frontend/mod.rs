@@ -748,6 +748,70 @@ impl<'a> Parser<'a> {
                     return Ok(Expr::Identifier(name));
                 }
 
+                let known_libraries = vec!["math", "fs", "net"];
+                if known_libraries.contains(&name.as_str())
+                    && let Token::Identifier(_) = &self.peek
+                {
+                    self.advance();
+
+                    let mut parts: Vec<String> = Vec::new();
+
+                    loop {
+                        match &self.cur {
+                            Token::Identifier(s) => {
+                                parts.push(s.clone());
+                            }
+                            Token::New => {
+                                parts.push("new".to_string());
+                            }
+                            _ => break,
+                        }
+
+                        if let Token::LParen = &self.peek {
+                            break;
+                        }
+                        if let Token::Identifier(_) | Token::New = &self.peek {
+                            self.advance();
+                        } else {
+                            break;
+                        }
+                    }
+                    if let Token::LParen = &self.peek {
+                        self.advance();
+                        self.advance();
+                        let mut args = Vec::new();
+                        while let Token::StringLiteral(_)
+                        | Token::Identifier(_)
+                        | Token::Number(_)
+                        | Token::LParen
+                        | Token::Bang
+                        | Token::Minus
+                        | Token::CharLiteral(_) = &self.cur
+                        {
+                            args.push(self.parse_expr()?);
+                            if let Token::Comma = &self.cur {
+                                self.advance();
+                                continue;
+                            }
+                            if let Token::RParen = &self.cur {
+                                break;
+                            }
+                        }
+                        if let Token::RParen = &self.cur {
+                            self.advance();
+                        } else {
+                            return Err("expected ')'".into());
+                        }
+                        let combined = format!("{}_{}", name, parts.join("_"));
+                        return Ok(Expr::Call {
+                            name: combined,
+                            args,
+                        });
+                    }
+
+                    return Ok(Expr::Identifier(name));
+                }
+
                 self.advance();
                 if let Token::LParen = &self.cur {
                     self.advance();

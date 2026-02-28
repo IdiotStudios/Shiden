@@ -47,6 +47,117 @@ Which are:
 
 * [Networking](src/libraries/networking)
 * [Filesystem](src/libraries/filesystem)
+* [Math](src/libraries/math)
+
+### Library Architecture
+
+Libraries are automatically discovered and compiled. Each library can contain helper functions written in:
+
+1. **Bytecode (Current):** x86-64 machine code embedded as vectors of bytes for maximum performance
+2. **Rust via Bytecode Compiler:** Rust functions that are transpiled to x86-64 bytecode at compile time
+
+To add a library function, create `src/libraries/xyz/lib.rs` or `src/libraries/xyz/mod.rs` with public functions. The Bytecode Compiler will discover and compile them automatically.
+
+### Bytecode Compiler
+
+The Shiden Bytecode Compiler (`src/compiler/`) is a custom Rust→x86-64 transpiler that compiles simple Rust functions into native machine code at build time.
+
+**Supported Rust Subset:**
+- Arithmetic operators: `+`, `-`, `*`, `/`, `%`
+- Comparison operators: `<`, `>`, `<=`, `>=`, `==`, `!=`
+- Logical operators: `&&`, `||`, `!`
+- Control flow: `if`/`else`, `while` loops
+- Variables with `let` and `mut`
+- Function parameters and return values (i64 only)
+- Function calls to other helper functions
+- Arrays (via helper functions like `array_get`, `array_set`, `len`)
+- **Structs** with fields and methods (Phase 3-4)
+- **Methods** with `self` parameter and method chaining (Phase 4)
+- **Associated Functions** (static methods) with `Type::function()` syntax (Phase 5)
+- **Return Values** from methods using `Self` type and explicit `return` statements (Phase 6)
+- **Mutable Self** with field assignments (Phase 7)
+- **Traits** - trait definitions with method signatures and trait implementations (Phase 8)
+- **Enums** with tagged variants (Phase 3)
+
+**Unsupported:**
+- String literals beyond what's hard-coded
+- Generics
+- Closures or higher-order functions
+- Complex pattern matching
+- Trait bounds and generic trait implementations
+- Associated types
+- Default trait implementations
+
+**Examples:**
+
+Associated Functions (Constructors):
+```rust
+struct Point {
+    x: i64,
+    y: i64,
+}
+
+impl Point {
+    fn new(x: i64, y: i64) -> Point {
+        Point { x: x, y: y }
+    }
+}
+
+pub fn create_point() -> i64 {
+    Point::new(10, 20).x
+}
+```
+
+Method Chaining with Return Values:
+```rust
+impl Point {
+    fn move_by(self, dx: i64, dy: i64) -> Point {
+        Point { x: self.x + dx, y: self.y + dy }
+    }
+}
+
+pub fn chain_operations() -> i64 {
+    Point::new(0, 0)
+        .move_by(10, 20)
+        .move_by(5, 5)
+        .x
+}
+```
+
+Mutable Self & Field Assignments:
+```rust
+impl Point {
+    fn reset(&mut self) {
+        self.x = 0;
+        self.y = 0;
+    }
+}
+```
+
+Traits:
+```rust
+trait Display {
+    fn show(self) -> i64;
+}
+
+impl Display for Point {
+    fn show(self) -> i64 {
+        self.x + self.y
+    }
+}
+
+pub fn use_trait() -> i64 {
+    Point::new(10, 20).show()
+}
+```
+
+**Configuration:**
+Stack allocation: 8-byte slots per local variable
+Local limit: 256 per function (configurable via `BYTECODE_MAX_LOCALS`)
+Division by zero: Traps (OS handles via exception)
+Recursion: Supported
+Optimization: Minimal (trivial inlines only)
+
 
 ## Multi-Platform Compilation
 

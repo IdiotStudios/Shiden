@@ -4,7 +4,7 @@ use object::{Architecture, Endianness};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use crate::libraries::runtime_helpers;
+use crate::libraries::runtime;
 
 mod linux;
 mod windows;
@@ -2027,7 +2027,7 @@ pub fn compile_project(
             .map_err(|e| format!("Failed to write object file {}: {}", obj_path.display(), e))?;
     }
 
-    let helpers: std::collections::BTreeMap<&str, Vec<u8>> = runtime_helpers::get_helpers(target);
+    let helpers: std::collections::BTreeMap<&str, Vec<u8>> = runtime::get_helpers(target);
 
     let mut helper_pos: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
     for (name, bytes) in helpers.iter() {

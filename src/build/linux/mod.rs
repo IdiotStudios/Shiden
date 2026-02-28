@@ -220,7 +220,7 @@ mod tests {
         let exe = compile_project(pd, "test", "x86_64-linux", None).expect("compile");
         let data = std::fs::read(&exe).expect("read exe");
 
-        let helpers = crate::libraries::runtime_helpers::get_helpers("x86_64-linux");
+        let helpers = crate::libraries::runtime::get_helpers("x86_64-linux");
         let net_h = helpers.get("net_server_new").expect("missing net helper");
         assert!(data.windows(net_h.len()).any(|w| w == net_h.as_slice()));
     }

@@ -471,7 +471,7 @@ pub fn write_executable_from_sections(
 #[cfg(not(windows))]
 mod tests {
     use crate::build::compile_project;
-    use crate::libraries::runtime_helpers;
+    use crate::libraries::runtime;
     use std::fs;
     use tempfile::tempdir;
 
@@ -520,7 +520,7 @@ mod tests {
         let exe = compile_project(pd, "test", "x86_64-windows", None).expect("compile");
         let data = std::fs::read(&exe).expect("read exe");
 
-        let helpers = runtime_helpers::get_helpers("x86_64-windows");
+        let helpers = runtime::get_helpers("x86_64-windows");
 
         let mut found_any = false;
         for (_name, helper) in helpers.iter() {
@@ -552,7 +552,7 @@ mod tests {
 
         let data = std::fs::read(&exe).expect("read exe");
 
-        let helpers = runtime_helpers::get_helpers("x86_64-windows");
+        let helpers = runtime::get_helpers("x86_64-windows");
         let net_helper = helpers
             .get("net_server_new")
             .expect("network helper missing");
