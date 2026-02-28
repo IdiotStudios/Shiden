@@ -2,11 +2,9 @@ use clap::{CommandFactory, Parser, Subcommand};
 use serde::Deserialize;
 use std::fs;
 use std::io::{self, Read};
-use std::time::{Duration, Instant};
 
 #[cfg(target_os = "windows")]
 mod hires_timer {
-    use std::time::Duration;
     unsafe extern "system" {
         fn QueryPerformanceFrequency(lpFrequency: *mut i64) -> i32;
         fn QueryPerformanceCounter(lpPerformanceCount: *mut i64) -> i32;
@@ -51,7 +49,6 @@ mod hires_timer {
 
 #[cfg(target_os = "macos")]
 mod hires_timer {
-    use std::time::Duration;
     unsafe extern "system" {
         fn mach_absolute_time() -> u64;
         fn mach_timebase_info(info: *mut MachTimebaseInfo) -> i32;
@@ -99,7 +96,7 @@ mod hires_timer {
 
 #[cfg(target_os = "linux")]
 mod hires_timer {
-    use std::time::Duration;
+
     unsafe extern "C" {
         fn clock_gettime(clk_id: i32, tp: *mut Timespec) -> i32;
     }
@@ -198,22 +195,6 @@ fn select_target(targets: Vec<String>) -> String {
         .first()
         .cloned()
         .unwrap_or_else(|| current_platform.to_string())
-}
-
-fn format_duration(duration: Duration) -> String {
-    let total_secs = duration.as_secs();
-    let subsec_nanos = duration.subsec_nanos() as u64;
-
-    let minutes = total_secs / 60;
-    let secs = total_secs % 60;
-    let millis = subsec_nanos / 1_000_000;
-    let nanos = subsec_nanos % 1_000;
-    let picos = 0u64;
-
-    format!(
-        "{}m {}s {}ms {}ns {}ps",
-        minutes, secs, millis, nanos, picos
-    )
 }
 
 fn format_hires_duration(duration: hires_timer::HighResDuration) -> String {
@@ -835,7 +816,7 @@ targets = ["x86_64-linux", "x86_64-windows"]"#,
 
         for t in targets {
             let exe = crate::build::compile_project(pd, &proj_name, &t, None)
-                .expect(&format!("compile target {}", t));
+                .unwrap_or_else(|_| panic!("compile target {}", t));
             assert!(
                 exe.exists(),
                 "executable for {} not found: {}",

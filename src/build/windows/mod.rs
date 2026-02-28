@@ -2,22 +2,23 @@ use std::path::{Path, PathBuf};
 
 use crate::build::linux::RelocEntry;
 
+#[allow(clippy::too_many_arguments)]
 pub fn write_executable_from_sections(
     out_dir: &Path,
     proj_name: &str,
     _target: &str,
-    text: &mut Vec<u8>,
-    rodata: &Vec<u8>,
-    string_positions: &Vec<usize>,
+    text: &mut [u8],
+    rodata: &[u8],
+    string_positions: &[usize],
     helper_pos: &std::collections::HashMap<String, usize>,
-    reloc_entries: &Vec<RelocEntry>,
+    reloc_entries: &[RelocEntry],
     func_label_map: &std::collections::HashMap<String, usize>,
     label_positions: &std::collections::HashMap<usize, usize>,
     argc_ro_offset: usize,
     argv_ro_offset: usize,
     argv_store_ro_offset: usize,
 ) -> Result<PathBuf, String> {
-    const IMAGE_BASE: u64 = 0x1400_0000_00u64;
+    const IMAGE_BASE: u64 = 0x0014_0000_0000_u64;
     const SECTION_ALIGNMENT: u32 = 0x1000;
     const FILE_ALIGNMENT: u32 = 0x200;
     const HEADER_NT_OFFSET: u32 = 0x80;
@@ -72,7 +73,7 @@ pub fn write_executable_from_sections(
     }
 
     fn align_up(v: u64, a: u64) -> u64 {
-        ((v + a - 1) / a) * a
+        v.div_ceil(a) * a
     }
 
     let mut import_funcs: Vec<String> = Vec::new();
@@ -87,10 +88,9 @@ pub fn write_executable_from_sections(
                 && s != "__argv_store"
                 && s != "_start"
                 && !func_label_map.contains_key(&s)
+                && !import_funcs.contains(&s)
             {
-                if !import_funcs.contains(&s) {
-                    import_funcs.push(s);
-                }
+                import_funcs.push(s);
             }
         }
     }
@@ -137,7 +137,7 @@ pub fn write_executable_from_sections(
     let text_vsize = text.len() as u64;
 
     let rodata_len = rodata.len();
-    let pad_rdata = if rodata_len % (FILE_ALIGNMENT as usize) == 0 {
+    let pad_rdata = if rodata_len.is_multiple_of(FILE_ALIGNMENT as usize) {
         0
     } else {
         (FILE_ALIGNMENT as usize) - (rodata_len % (FILE_ALIGNMENT as usize))
@@ -171,16 +171,15 @@ pub fn write_executable_from_sections(
                 text[off..off + 8].copy_from_slice(&le);
                 continue;
             }
-            if let Some(stripped) = sym.strip_prefix(".str.") {
-                if let Ok(idx) = stripped.parse::<usize>() {
-                    if idx < string_positions.len() {
-                        let pos_in_rdata = string_positions[idx] as u64;
-                        let va = IMAGE_BASE + rdata_rva + pos_in_rdata;
-                        let le = va.to_le_bytes();
-                        text[off..off + 8].copy_from_slice(&le);
-                        continue;
-                    }
-                }
+            if let Some(stripped) = sym.strip_prefix(".str.")
+                && let Ok(idx) = stripped.parse::<usize>()
+                && idx < string_positions.len()
+            {
+                let pos_in_rdata = string_positions[idx] as u64;
+                let va = IMAGE_BASE + rdata_rva + pos_in_rdata;
+                let le = va.to_le_bytes();
+                text[off..off + 8].copy_from_slice(&le);
+                continue;
             }
             if sym == "__argc" {
                 let pos_in_rdata = argc_ro_offset as u64;
@@ -203,14 +202,14 @@ pub fn write_executable_from_sections(
                 text[off..off + 8].copy_from_slice(&le);
                 continue;
             }
-            if let Some(lbl) = func_label_map.get(&sym) {
-                if let Some(v) = label_positions.get(lbl) {
-                    let pos_in_text = *v as u64;
-                    let va = IMAGE_BASE + text_rva + pos_in_text;
-                    let le = va.to_le_bytes();
-                    text[off..off + 8].copy_from_slice(&le);
-                    continue;
-                }
+            if let Some(lbl) = func_label_map.get(&sym)
+                && let Some(v) = label_positions.get(lbl)
+            {
+                let pos_in_text = *v as u64;
+                let va = IMAGE_BASE + text_rva + pos_in_text;
+                let le = va.to_le_bytes();
+                text[off..off + 8].copy_from_slice(&le);
+                continue;
             }
             if sym == "_start" {
                 let le = (0u64).to_le_bytes();
@@ -224,7 +223,7 @@ pub fn write_executable_from_sections(
 
     pe.extend_from_slice(&[0x4D, 0x5A]);
     pe.resize(0x3C, 0);
-    pe.extend_from_slice(&(HEADER_NT_OFFSET as u32).to_le_bytes());
+    pe.extend_from_slice(&HEADER_NT_OFFSET.to_le_bytes());
 
     if pe.len() < (HEADER_NT_OFFSET as usize) {
         pe.resize(HEADER_NT_OFFSET as usize, 0);
@@ -255,8 +254,8 @@ pub fn write_executable_from_sections(
 
     pe.extend_from_slice(&IMAGE_BASE.to_le_bytes());
 
-    pe.extend_from_slice(&(SECTION_ALIGNMENT as u32).to_le_bytes());
-    pe.extend_from_slice(&(FILE_ALIGNMENT as u32).to_le_bytes());
+    pe.extend_from_slice(&SECTION_ALIGNMENT.to_le_bytes());
+    pe.extend_from_slice(&FILE_ALIGNMENT.to_le_bytes());
 
     pe.extend_from_slice(&0u16.to_le_bytes());
     pe.extend_from_slice(&0u16.to_le_bytes());
@@ -315,7 +314,7 @@ pub fn write_executable_from_sections(
     }
 
     let mut file_bytes: Vec<u8> = pe.clone();
-    file_bytes.extend_from_slice(&text);
+    file_bytes.extend_from_slice(text);
 
     let pad_text = (FILE_ALIGNMENT as usize) - (text.len() % FILE_ALIGNMENT as usize);
     if pad_text != FILE_ALIGNMENT as usize {
@@ -377,10 +376,8 @@ pub fn write_executable_from_sections(
             let by_name_rva = name_rvas[i] as u64;
 
             let buf = (by_name_rva).to_le_bytes();
-            for j in 0..8 {
-                file_bytes[ilt_entry_off + j] = buf[j];
-                file_bytes[iat_entry_off + j] = buf[j];
-            }
+            file_bytes[ilt_entry_off..(8 + ilt_entry_off)].copy_from_slice(&buf);
+            file_bytes[iat_entry_off..(8 + iat_entry_off)].copy_from_slice(&buf);
         }
 
         let ilt_rva =
@@ -402,7 +399,7 @@ pub fn write_executable_from_sections(
             (rdata_rva + (import_descriptor_file_off as u64 - rodata_start as u64)) as u32;
         let import_dir_size = ((cursor + 20) - import_descriptor_file_off) as u32;
 
-        let imp_off = data_directory_offset + (1 * 8);
+        let imp_off = data_directory_offset + 8;
 
         for buf in [&mut pe, &mut file_bytes].iter_mut() {
             buf[imp_off..imp_off + 4].copy_from_slice(&import_dir_rva.to_le_bytes());
@@ -413,7 +410,7 @@ pub fn write_executable_from_sections(
             if let Some(sym_name) = &r.sym_name {
                 let s = String::from_utf8_lossy(sym_name).into_owned();
                 if import_funcs.contains(&s) {
-                    let off = r.offset as usize;
+                    let off = r.offset;
                     if off >= 2 {
                         text[off - 2] = 0x48;
                         text[off - 1] = 0xA1;
@@ -424,7 +421,7 @@ pub fn write_executable_from_sections(
                         + import_block_rva
                         + (iat_file_off as u64 - import_block_offset_in_file as u64)
                         + (idx as u64 * 8);
-                    let le = (iat_entry_va as u64).to_le_bytes();
+                    let le = iat_entry_va.to_le_bytes();
                     text[off..off + 8].copy_from_slice(&le);
 
                     let file_off = pe.len() + off;
@@ -626,7 +623,7 @@ mod tests {
             "could not parse .rdata header"
         );
 
-        const IMAGE_BASE: u64 = 0x1400_0000_00u64;
+        const IMAGE_BASE: u64 = 0x0014_0000_0000_u64;
         let rva = (exit_imm - IMAGE_BASE) as usize;
         let iat_off = rdata_file as usize + (rva - rdata_rva as usize);
         assert!(

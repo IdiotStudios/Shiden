@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 
 pub fn get_helpers(target: &str) -> BTreeMap<&'static str, Vec<u8>> {
-    let math_helpers = crate::libraries::math::helpers::get_math_helpers();
     if target.contains("windows") {
         let mut m = BTreeMap::new();
 
@@ -150,10 +149,6 @@ pub fn get_helpers(target: &str) -> BTreeMap<&'static str, Vec<u8>> {
             "net_close",
             vec![0xB8, 0x03, 0x00, 0x00, 0x00, 0x0F, 0x05, 0xC3],
         );
-
-        for (name, code) in math_helpers.iter() {
-            m.insert(name, code.clone());
-        }
 
         return m;
     }
@@ -380,10 +375,6 @@ pub fn get_helpers(target: &str) -> BTreeMap<&'static str, Vec<u8>> {
         "net_close",
         vec![0xB8, 0x03, 0x00, 0x00, 0x00, 0x0F, 0x05, 0xC3],
     );
-
-    for (name, code) in math_helpers.iter() {
-        m.insert(name, code.clone());
-    }
 
     m
 }

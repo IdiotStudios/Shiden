@@ -256,6 +256,7 @@ pub fn compile_project(
         Call(String, usize),
         Ret,
         EmitInt,
+        #[allow(dead_code)]
         EmitFloat,
         EmitChar,
         StoreLocal(usize),
@@ -324,14 +325,6 @@ pub fn compile_project(
             .parse::<u32>()
             .map_err(|_| format!("invalid type: {}", ty))?;
         Ok((kind, bits))
-    }
-
-    fn truncate_to_width(value: i64, bits: u32) -> i64 {
-        if bits == 0 || bits >= 64 {
-            return value;
-        }
-        let mask = (1i64 << bits) - 1;
-        value & mask
     }
 
     fn lower_expr_to_ir(
@@ -586,10 +579,11 @@ pub fn compile_project(
                 if let Some(ty) = ty {
                     types.insert(name.clone(), ty.clone());
 
-                    if let Ok((_, bits)) = parse_type_width(ty) {
-                        if bits > 0 && bits < 64 {
-                            res.push(IrInstr::Truncate(bits));
-                        }
+                    if let Ok((_, bits)) = parse_type_width(ty)
+                        && bits > 0
+                        && bits < 64
+                    {
+                        res.push(IrInstr::Truncate(bits));
                     }
                 }
                 res.push(IrInstr::StoreLocal(idx));
@@ -717,15 +711,16 @@ pub fn compile_project(
                                         continue;
                                     }
 
-                                    if let Some(ty) = types.get(id) {
-                                        if ty.starts_with('f') && ty[1..].parse::<u32>().is_ok() {
-                                            lower_expr_to_ir(
-                                                arg_expr, &mut res, locals, next_local, next_label,
-                                            )?;
+                                    if let Some(ty) = types.get(id)
+                                        && ty.starts_with('f')
+                                        && ty[1..].parse::<u32>().is_ok()
+                                    {
+                                        lower_expr_to_ir(
+                                            arg_expr, &mut res, locals, next_local, next_label,
+                                        )?;
 
-                                            res.push(IrInstr::EmitInt);
-                                            continue;
-                                        }
+                                        res.push(IrInstr::EmitInt);
+                                        continue;
                                     }
 
                                     lower_expr_to_ir(
@@ -738,27 +733,26 @@ pub fn compile_project(
                                 if let Expr::Binary { left, op, right } = arg_expr {
                                     let is_float = matches!(left.as_ref(), Expr::Float(_))
                                         || matches!(right.as_ref(), Expr::Float(_));
-                                    if is_float {
-                                        if let (Expr::Float(l), Expr::Float(r)) =
+                                    if is_float
+                                        && let (Expr::Float(l), Expr::Float(r)) =
                                             (left.as_ref(), right.as_ref())
-                                        {
-                                            let result = match op {
-                                                crate::syntax::BinOp::Add => l + r,
-                                                crate::syntax::BinOp::Sub => l - r,
-                                                crate::syntax::BinOp::Mul => l * r,
-                                                crate::syntax::BinOp::Div => l / r,
-                                                _ => {
-                                                    lower_expr_to_ir(
-                                                        arg_expr, &mut res, locals, next_local,
-                                                        next_label,
-                                                    )?;
-                                                    res.push(IrInstr::EmitInt);
-                                                    continue;
-                                                }
-                                            };
-                                            res.push(IrInstr::EmitString(format!("{}", result)));
-                                            continue;
-                                        }
+                                    {
+                                        let result = match op {
+                                            crate::syntax::BinOp::Add => l + r,
+                                            crate::syntax::BinOp::Sub => l - r,
+                                            crate::syntax::BinOp::Mul => l * r,
+                                            crate::syntax::BinOp::Div => l / r,
+                                            _ => {
+                                                lower_expr_to_ir(
+                                                    arg_expr, &mut res, locals, next_local,
+                                                    next_label,
+                                                )?;
+                                                res.push(IrInstr::EmitInt);
+                                                continue;
+                                            }
+                                        };
+                                        res.push(IrInstr::EmitString(format!("{}", result)));
+                                        continue;
                                     }
                                 }
 
@@ -1249,7 +1243,9 @@ pub fn compile_project(
     let _locals_id_opt: Option<object::write::SymbolId> = None;
 
     let mut text = Vec::new();
+    #[allow(unused_assignments)]
     let mut argc_reloc_offset: Option<usize> = None;
+    #[allow(unused_assignments)]
     let mut argv_reloc_offset: Option<usize> = None;
     let mut argv_store_reloc_offset: Option<usize> = None;
     let mut gcl_reloc_offset: Option<usize> = None;
@@ -1258,7 +1254,7 @@ pub fn compile_project(
         fn mark_label(
             labels: &mut std::collections::HashMap<&'static str, usize>,
             name: &'static str,
-            buf: &Vec<u8>,
+            buf: &[u8],
         ) {
             labels.insert(name, buf.len());
         }
@@ -1379,7 +1375,7 @@ pub fn compile_project(
                 .get(label)
                 .ok_or_else(|| format!("missing label {} in windows arg prologue", label))?;
             let rel = (target as i64) - ((pos as i64) + 1);
-            if rel < -128 || rel > 127 {
+            if !(-128..=127).contains(&rel) {
                 return Err(format!("jump out of range for {}: {}", label, rel));
             }
             text[pos] = (rel as i8) as u8;

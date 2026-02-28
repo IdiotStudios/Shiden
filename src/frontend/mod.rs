@@ -748,7 +748,7 @@ impl<'a> Parser<'a> {
                     return Ok(Expr::Identifier(name));
                 }
 
-                let known_libraries = vec!["math", "fs", "net"];
+                let known_libraries = ["math", "fs", "net"];
                 if known_libraries.contains(&name.as_str())
                     && let Token::Identifier(_) = &self.peek
                 {

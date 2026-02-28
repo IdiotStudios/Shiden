@@ -7,15 +7,16 @@ pub struct RelocEntry {
     pub _is_call: bool,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn write_executable_from_sections(
     out_dir: &Path,
     proj_name: &str,
     target: &str,
-    text: &mut Vec<u8>,
-    rodata: &Vec<u8>,
-    string_positions: &Vec<usize>,
+    text: &mut [u8],
+    rodata: &[u8],
+    string_positions: &[usize],
     helper_pos: &HashMap<String, usize>,
-    reloc_entries: &Vec<RelocEntry>,
+    reloc_entries: &[RelocEntry],
     func_label_map: &HashMap<String, usize>,
     label_positions: &HashMap<usize, usize>,
     argc_ro_offset: usize,
@@ -124,8 +125,8 @@ pub fn write_executable_from_sections(
     let mut file_bytes: Vec<u8> = elf;
     file_bytes.resize(file_text_off, 0);
 
-    file_bytes.extend_from_slice(&text);
-    file_bytes.extend_from_slice(&rodata);
+    file_bytes.extend_from_slice(text);
+    file_bytes.extend_from_slice(rodata);
 
     let exe_name = format!("{}{}", proj_name, super::get_executable_extension(target));
     let exe_path = out_dir.join(&exe_name);

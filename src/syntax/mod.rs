@@ -182,13 +182,23 @@ impl<'a> Lexer<'a> {
         if ch == '/' {
             let rest = &self.src[self.pos + 1..];
 
-            let types = [
-                "u8", "u16", "u32", "u64", "usize", "i8", "i16", "i32", "i64", "f32", "f64", "str",
-                "char", "bool", "array", "unit", "import",
-            ];
-            for ty in types.iter() {
-                if let Some(after) = rest.strip_prefix(ty) {
-                    let next_char = after.chars().next();
+            if let Some(first) = rest.chars().next()
+                && (first.is_ascii_alphabetic() || first == '_')
+            {
+                let mut type_name = String::new();
+                let mut j = 0;
+                for c in rest.chars() {
+                    if c.is_ascii_alphanumeric() || c == '_' {
+                        type_name.push(c);
+                        j += c.len_utf8();
+                    } else {
+                        break;
+                    }
+                }
+
+                if !type_name.is_empty() {
+                    let next_char = rest.chars().nth(type_name.chars().count());
+
                     if next_char.is_none()
                         || next_char == Some('\n')
                         || next_char == Some('\r')
@@ -197,40 +207,10 @@ impl<'a> Lexer<'a> {
                         || next_char == Some(',')
                         || next_char == Some(')')
                         || next_char == Some('/')
+                        || next_char == Some(']')
                     {
-                        self.bump(1 + ty.len());
-                        return (Token::Type(ty.to_string()), start_line, start_col);
-                    }
-                }
-            }
-
-            if let Some(first) = rest.chars().next() {
-                if first == 'i' || first == 'u' || first == 'f' {
-                    let mut num_str = String::new();
-                    let mut j = 1;
-                    for c in rest[1..].chars() {
-                        if c.is_ascii_digit() {
-                            num_str.push(c);
-                            j += 1;
-                        } else {
-                            break;
-                        }
-                    }
-                    if !num_str.is_empty() {
-                        let next_char = rest.chars().nth(j);
-                        if next_char.is_none()
-                            || next_char == Some('\n')
-                            || next_char == Some('\r')
-                            || next_char == Some(' ')
-                            || next_char == Some('\t')
-                            || next_char == Some(',')
-                            || next_char == Some(')')
-                            || next_char == Some('/')
-                        {
-                            let type_str = format!("{}{}", first, num_str);
-                            self.bump(1 + type_str.len());
-                            return (Token::Type(type_str), start_line, start_col);
-                        }
+                        self.bump(1 + j);
+                        return (Token::Type(type_name), start_line, start_col);
                     }
                 }
             }
