@@ -13,41 +13,28 @@ Used AI for inline code completions and for documentation writing.
 [VSCode-Extension](https://marketplace.visualstudio.com/items?itemName=IdiotStudios.shiden)  
 [Flavortown-Project](https://flavortown.hackclub.com/projects/10866)  
 [Shiden-Docs](https://shiden.arson.dev/docs)  
-[Browser-Extension]() (hint...)  
 [Shiden-Hosting]() (hint...)  
 [Shiden-Playground]() (hint...)  
-[Shiden-LLM-Code-Assistant]() (hint...)  
 [Shiden-Package-Registry]() (hint...)  
 [Benchmarks]() (hmm very soon)  
 
 ## Todo
 
 - Improved error messages with code snippets and suggestions
-- Support for more platforms (Windows, macOS)
 - Built-in libraries for common tasks (networking, filesystem, etc.)
-- Documentation and more examples
+- Better Documentation and more examples
 - Unsafe code blocks for low-level operations
 - Better testing framework and support for unit/integration tests (future plan)
 - IDE integration and language server support (future plan)
 - Performance optimizations and benchmarking tools (future plan)
-- Split the compiler into multiple stages (lexer, parser, semantic analysis, code generation) for better modularity and maintainability (future plan)
 - Support for more data types and features (enums, traits, async/await, etc.) (future plan)
-- A standard library for common utilities and data structures (future plan)
-- A REPL for interactive coding and experimentation (future plan)
-- A web-based playground for trying out Shiden code without installing anything (future plan)
-- A LLM-based code assistant for generating code snippets and providing suggestions (future plan)
-- A community-driven package registry for sharing and discovering libraries (future plan)
-- ISO compilation target for OS development (future plan)
-- WebAssembly target for running Shiden code in the browser (future plan)
 
 ## Libraries
 
 Shiden has built in [libraries](src/libraries).  
 Which are:
 
-* [Networking](src/libraries/networking)
 * [Filesystem](src/libraries/filesystem)
-* [Math](src/libraries/math)
 
 ### Library Architecture
 
@@ -74,16 +61,25 @@ pub const add: &[u8] = &[
 ];
 ```
 
-
 ## Multi-Platform Compilation
 
 Shiden supports compiling for multiple platforms. The compiler automatically detects your current platform and builds for it, with the ability to cross-compile to other targets.
 
 ### Supported Platforms
 
-* **Linux** (`x86_64-linux`) - Implemented
-* **Windows** (`x86_64-windows`) - In progress (needs more work, especially around runtime args handling)
-* **macOS** (`x86_64-macos`) - Planned (after Windows)
+* **Linux** (`linux`) - Implemented
+* **Windows** (`windows`) - Implemented (beta)
+* **macOS** (`macos`) - Planned
+
+### Soon to be Supported
+
+* **WebAssembly** (`wasm`)
+* **ARM** (`arm`)
+* **32-bit x86** (`x86`)
+* **RISC-V** (`riscv`)
+* **PowerPC** (`ppc`)
+* **Mobile (iOS/Android)** (`mobile`)
+* **Operating System** (`iso`)
 
 ### Configure Targets
 
@@ -92,22 +88,17 @@ Specify your target platforms in `shiden.toml`:
 ```toml
 [build]
 opt_level = 3
-targets = ["x86_64-linux", "x86_64-windows", "x86_64-macos"]
+targets = ["linux", "windows", "macos"]
 ```
 
 ## CLI
 
-CLI NAME: Shiden
-
-### Commands:
-
-* Shiden new {name} (makes an new project)
-* Shiden init (makes a new project)
-* Shiden check (checks code for errors — supports `--format json` for structured diagnostics)
+* Shiden parse (parses shiden stuff)
 * Shiden run (release mode by default, add --debug for debug mode)
-* Shiden compile (release mode by default, add --debug for debug mode)
-* Shiden clean (removes build artifacts)
-* Shiden tests (runs tests [future plan])
+* Shiden check (runs checks)
+* Shiden new {name} (makes an new project)
+* Shiden compile (Compiles Shiden (Shiden run does the same anyway))
+* Shiden help (shows a help command)
 
 ### Shiden init/new folder formats
 
@@ -117,26 +108,13 @@ my_project/
 ├── src/  
 │   └── main.sd         // Executable entry  
 ├── tests/  
-│   └── example.sd  
-├── build/              // Compiled binaries
-│   ├── cache/   // Build cache
-│   ├── x86_64-linux/   // Linux target
-│   ├── x86_64-windows/ // Windows target
-│   └── x86_64-macos/   // macOS target
+│   └── example.sd  // doesent work yet  
+├── build/              // Compiled binaries  
+│   ├── cache/   // Build cache (none)  
+│   ├── linux/   // Linux target  
+│   ├── windows/ // Windows target  
+│   └── macos/   // macOS target  
 └── README.md  
-```
-
-shiden.toml:
-```toml
-  [project]
-  name = "my_project"
-  version = "0.1.0"
-  license = "MIT"
-
-  [build]
-  opt_level = 3
-  # Target platforms to compile for
-  targets = ["x86_64-linux", "x86_64-windows", "x86_64-macos"]
 ```
 
 ## Contributing
