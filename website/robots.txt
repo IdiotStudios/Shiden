@@ -1,0 +1,4 @@
+User-agent: *
+Disallow:
+
+Sitemap: https://shiden.arson.dev/sitemap.xml
