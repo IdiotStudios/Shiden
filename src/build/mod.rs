@@ -1855,7 +1855,12 @@ pub fn compile_project(
                     text.extend_from_slice(&[0x48, 0x89, 0xE5]);
 
                     let mut f_alloc = (*local_count as i64) * 8;
-                    if f_alloc % 16 == 0 {
+                    if target.contains("windows") {
+                        let rem = f_alloc % 16;
+                        if rem != 0 {
+                            f_alloc += 16 - rem;
+                        }
+                    } else if f_alloc % 16 == 0 {
                         f_alloc += 8;
                     }
                     if f_alloc > 0 {
@@ -1999,8 +2004,13 @@ pub fn compile_project(
                 }
 
                 if target.contains("windows") {
-                    text.extend_from_slice(&[0x48, 0x83, 0xEC, 0x20]);
-                    call_shadow_alloc = 32;
+                    let align_fix = if stack_count % 2 == 1 { 8 } else { 0 };
+                    call_shadow_alloc = 32 + align_fix;
+                    if call_shadow_alloc == 32 {
+                        text.extend_from_slice(&[0x48, 0x83, 0xEC, 0x20]);
+                    } else {
+                        text.extend_from_slice(&[0x48, 0x83, 0xEC, 0x28]);
+                    }
                 }
 
                 if let Some(lbl) = func_label_map.get(&name) {
