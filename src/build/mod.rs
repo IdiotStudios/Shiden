@@ -2160,22 +2160,28 @@ pub fn compile_project(
         if *name == "__build_args_array" {
             if target.contains("windows") {
                 reloc_entries.push(RelocEntry {
-                    offset: pos + 17,
-                    sym_name: Some(b"GetCommandLineA".to_vec()),
+                    offset: pos + 2,
+                    sym_name: Some(b"__argc".to_vec()),
                     _is_call: false,
                 });
                 reloc_entries.push(RelocEntry {
-                    offset: pos + 32,
+                    offset: pos + 15,
+                    sym_name: Some(b"__argv".to_vec()),
+                    _is_call: false,
+                });
+
+                reloc_entries.push(RelocEntry {
+                    offset: pos + 41,
                     sym_name: Some(b"array_new".to_vec()),
                     _is_call: false,
                 });
                 reloc_entries.push(RelocEntry {
-                    offset: pos + 114,
+                    offset: pos + 71,
                     sym_name: Some(b"__cstr_to_string".to_vec()),
                     _is_call: false,
                 });
                 reloc_entries.push(RelocEntry {
-                    offset: pos + 135,
+                    offset: pos + 89,
                     sym_name: Some(b"push".to_vec()),
                     _is_call: false,
                 });
