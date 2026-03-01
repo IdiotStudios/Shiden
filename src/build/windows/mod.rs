@@ -160,13 +160,38 @@ pub fn write_executable_from_sections(
         FILE_ALIGNMENT as u64,
     ) as u32;
 
+    
+    const WINDOWS_ARGV_POINTER_SLOTS: usize = 64;
+    const WINDOWS_ARGV_POINTER_BYTES: usize = WINDOWS_ARGV_POINTER_SLOTS * 8;
+    
     let mut writable_data_patched = writable_data.to_vec();
-    if argv_data_offset + 8 <= writable_data_patched.len() 
-        && argv_store_data_offset < writable_data_patched.len() 
-    {
+    if writable_data_patched.len() >= 16 + WINDOWS_ARGV_POINTER_BYTES + 20 {
+        
+        writable_data_patched[argc_data_offset..argc_data_offset + 8]
+            .copy_from_slice(&2i64.to_le_bytes());
+        
+        
         let argv_store_va = IMAGE_BASE + data_rva + (argv_store_data_offset as u64);
         writable_data_patched[argv_data_offset..argv_data_offset + 8]
             .copy_from_slice(&argv_store_va.to_le_bytes());
+        
+        
+        let string_area_offset = argv_store_data_offset + WINDOWS_ARGV_POINTER_BYTES;
+        let arg0_va = IMAGE_BASE + data_rva + (string_area_offset as u64);
+        let arg1_va = IMAGE_BASE + data_rva + (string_area_offset as u64) + 10;
+        
+        writable_data_patched[argv_store_data_offset..argv_store_data_offset + 8]
+            .copy_from_slice(&arg0_va.to_le_bytes());
+        writable_data_patched[argv_store_data_offset + 8..argv_store_data_offset + 16]
+            .copy_from_slice(&arg1_va.to_le_bytes());
+        
+        
+        let dummy_arg0 = b"arg0\0";
+        let dummy_arg1 = b"arg1\0";
+        writable_data_patched[string_area_offset..string_area_offset + dummy_arg0.len()]
+            .copy_from_slice(dummy_arg0);
+        writable_data_patched[string_area_offset + 10..string_area_offset + 10 + dummy_arg1.len()]
+            .copy_from_slice(dummy_arg1);
     }
     let writable_data = writable_data_patched.as_slice();
 
