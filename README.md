@@ -4,6 +4,40 @@ Shiden is a high-performance, ahead-of-time compiled programming language built 
 
 Shiden has a .sd file format
 
+## Installation
+
+### Quick Start
+
+**Linux/macOS:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/IdiotStudios/Shiden/main/install.sh | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+powershell -ExecutionPolicy Bypass -File (iwr https://raw.githubusercontent.com/IdiotStudios/Shiden/main/install.ps1 -UseBasicParsing).Content
+```
+
+### From Source (Cargo)
+
+```bash
+cargo install shiden
+```
+
+### Auto-Updates
+
+Check for updates:
+```bash
+shiden update --check
+```
+
+Install latest version:
+```bash
+shiden update
+```
+
+See [INSTALL.md](https://shiden.arson.dev/docs/#installation) for detailed installation instructions and troubleshooting.
+
 ## Some things we have
 
 [VSCode-Extension](https://marketplace.visualstudio.com/items?itemName=IdiotStudios.shiden)  
