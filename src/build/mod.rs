@@ -1494,12 +1494,8 @@ pub fn compile_project(
     let mut alloc = (locals_count as i64) * 8;
     if target.contains("windows") {
         let rem = alloc % 16;
-        if rem == 0 {
-            alloc += 8;
-        } else if rem < 8 {
-            alloc += 8 - rem;
-        } else {
-            alloc += 24 - rem;
+        if rem != 0 {
+            alloc += 16 - rem;
         }
     } else if alloc % 16 == 0 {
         alloc += 8;
