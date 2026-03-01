@@ -272,9 +272,9 @@ pub fn write_executable_from_sections(
     pe.extend_from_slice(&0u16.to_le_bytes());
 
     pe.extend_from_slice(&0x100000u64.to_le_bytes());
-    pe.extend_from_slice(&0x1000u64.to_le_bytes());
+    pe.extend_from_slice(&0x10000u64.to_le_bytes());
     pe.extend_from_slice(&0x100000u64.to_le_bytes());
-    pe.extend_from_slice(&0x1000u64.to_le_bytes());
+    pe.extend_from_slice(&0x10000u64.to_le_bytes());
 
     pe.extend_from_slice(&0u32.to_le_bytes());
     pe.extend_from_slice(&16u32.to_le_bytes());
