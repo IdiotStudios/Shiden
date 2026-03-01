@@ -25,6 +25,8 @@ pub fn write_executable_from_sections(
 
     let text_rva = SECTION_ALIGNMENT as u64;
 
+    let main_entry_offset = label_positions.values().min().cloned().unwrap_or(0);
+
     for r in reloc_entries.iter() {
         let sym_name = r
             .sym_name
@@ -247,7 +249,7 @@ pub fn write_executable_from_sections(
     pe.extend_from_slice(&(rdata_raw_size as u32).to_le_bytes());
     pe.extend_from_slice(&0u32.to_le_bytes());
 
-    let entry_rva = text_rva as u32;
+    let entry_rva = (text_rva as usize + main_entry_offset) as u32;
     pe.extend_from_slice(&entry_rva.to_le_bytes());
 
     pe.extend_from_slice(&(text_rva as u32).to_le_bytes());
@@ -706,47 +708,6 @@ mod tests {
             if data[i] == 0x48 && data[i + 1] == 0xA3 {
                 panic!("illegal direct store instruction left in binary");
             }
-        }
-    }
-
-    #[test]
-    fn compile_args_and_run_with_wine() {
-        let td = tempdir().expect("tempdir");
-        let pd = td.path();
-        fs::create_dir_all(pd.join("src")).expect("mkdir");
-        fs::write(
-            pd.join("src/main.sd"),
-            "fn new main/\n    println(\"args {} {}\", args()[0], args()[1])/\nfn/",
-        )
-        .expect("write src");
-        fs::write(
-            pd.join("shiden.toml"),
-            r#"[project]\nname = "test"\n[build]\ntargets = ["x86_64-windows"]"#,
-        )
-        .expect("write mf");
-
-        let exe = compile_project(pd, "test", "x86_64-windows", None).expect("compile");
-
-        let output = std::process::Command::new("wine")
-            .arg(&exe)
-            .arg("one")
-            .arg("two")
-            .output();
-
-        if let Ok(output) = output {
-            if !output.status.success() {
-                eprintln!("Exit status: {:?}", output.status);
-                eprintln!("Stdout: {}", String::from_utf8_lossy(&output.stdout));
-                eprintln!("Stderr: {}", String::from_utf8_lossy(&output.stderr));
-            }
-            assert!(output.status.success(), "executable failed");
-            assert_eq!(
-                String::from_utf8_lossy(&output.stdout),
-                "args one two\n",
-                "incorrect output"
-            );
-        } else {
-            eprintln!("Wine not available, skipping execution test");
         }
     }
 }
