@@ -430,6 +430,14 @@ pub fn write_executable_from_sections(
                         file_bytes[file_off - 1] = 0xA1;
                     }
                     file_bytes[file_off..file_off + 8].copy_from_slice(&le);
+                } else if let Some(helper_offset) = helper_pos.get(s.as_str()) {
+                    let off = r.offset;
+                    let helper_va = IMAGE_BASE + text_rva + (*helper_offset as u64);
+                    let le = helper_va.to_le_bytes();
+                    text[off..off + 8].copy_from_slice(&le);
+
+                    let file_off = pe.len() + off;
+                    file_bytes[file_off..file_off + 8].copy_from_slice(&le);
                 }
             }
         }
