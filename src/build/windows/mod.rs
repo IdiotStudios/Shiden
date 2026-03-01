@@ -25,8 +25,6 @@ pub fn write_executable_from_sections(
 
     let text_rva = SECTION_ALIGNMENT as u64;
 
-    let main_entry_offset = label_positions.values().min().cloned().unwrap_or(0);
-
     for r in reloc_entries.iter() {
         let sym_name = r
             .sym_name
@@ -249,7 +247,7 @@ pub fn write_executable_from_sections(
     pe.extend_from_slice(&(rdata_raw_size as u32).to_le_bytes());
     pe.extend_from_slice(&0u32.to_le_bytes());
 
-    let entry_rva = (text_rva as usize + main_entry_offset) as u32;
+    let entry_rva = text_rva as u32;
     pe.extend_from_slice(&entry_rva.to_le_bytes());
 
     pe.extend_from_slice(&(text_rva as u32).to_le_bytes());
@@ -399,7 +397,7 @@ pub fn write_executable_from_sections(
 
         let import_dir_rva =
             (rdata_rva + (import_descriptor_file_off as u64 - rodata_start as u64)) as u32;
-        let import_dir_size = ((cursor + 20) - import_descriptor_file_off) as u32;
+        let import_dir_size = 40u32;
 
         let imp_off = data_directory_offset + 8;
 
