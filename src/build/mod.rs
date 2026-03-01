@@ -1865,7 +1865,11 @@ pub fn compile_project(
                         text.write_i32::<LittleEndian>(f_alloc as i32).unwrap();
                     }
 
-                    let reg_codes: [u8; 6] = [7, 6, 2, 1, 8, 9];
+                    let reg_codes: &[u8] = if target.contains("windows") {
+                        &[1, 2, 8, 9]
+                    } else {
+                        &[7, 6, 2, 1, 8, 9]
+                    };
 
                     for (i, &reg) in reg_codes.iter().enumerate().take(*param_count) {
                         let local_offset = 8 + (i as i32 * 8);
@@ -1878,11 +1882,16 @@ pub fn compile_project(
                         text.write_i32::<LittleEndian>(-local_offset).unwrap();
                     }
 
-                    if *param_count > 6 {
-                        for i in 6..*param_count {
+                    let stack_param_start = reg_codes.len();
+                    if *param_count > stack_param_start {
+                        for i in stack_param_start..*param_count {
                             let local_offset = 8 + (i as i32 * 8);
                             text.extend_from_slice(&[0x48, 0x8B, 0x85]);
-                            let src_disp = 16 + ((i - 6) as i32 * 8);
+                            let src_disp = if target.contains("windows") {
+                                16 + 32 + ((i - stack_param_start) as i32 * 8)
+                            } else {
+                                16 + ((i - stack_param_start) as i32 * 8)
+                            };
                             text.write_i32::<LittleEndian>(src_disp).unwrap();
 
                             text.extend_from_slice(&[0x48, 0x89, 0x85]);
@@ -1892,24 +1901,40 @@ pub fn compile_project(
                 }
             }
             IrInstr::Call(name, nargs) => {
-                let num_reg = if nargs > 6 { 6 } else { nargs };
-                let stack_count = nargs.saturating_sub(6);
-                let use_pop_args = nargs <= 6;
+                let reg_arg_limit = if target.contains("windows") { 4 } else { 6 };
+                let num_reg = if nargs > reg_arg_limit {
+                    reg_arg_limit
+                } else {
+                    nargs
+                };
+                let stack_count = nargs.saturating_sub(reg_arg_limit);
+                let use_pop_args = nargs <= reg_arg_limit;
                 let mut scratch_alloc: i32 = 0;
+                let mut call_shadow_alloc: i32 = 0;
 
                 use byteorder::WriteBytesExt as _;
 
                 if nargs > 0 {
                     if use_pop_args {
                         for i in (0..nargs).rev() {
-                            match i {
-                                0 => text.push(0x5F),
-                                1 => text.push(0x5E),
-                                2 => text.push(0x5A),
-                                3 => text.push(0x59),
-                                4 => text.extend_from_slice(&[0x41, 0x58]),
-                                5 => text.extend_from_slice(&[0x41, 0x59]),
-                                _ => {}
+                            if target.contains("windows") {
+                                match i {
+                                    0 => text.push(0x59),
+                                    1 => text.push(0x5A),
+                                    2 => text.extend_from_slice(&[0x41, 0x58]),
+                                    3 => text.extend_from_slice(&[0x41, 0x59]),
+                                    _ => {}
+                                }
+                            } else {
+                                match i {
+                                    0 => text.push(0x5F),
+                                    1 => text.push(0x5E),
+                                    2 => text.push(0x5A),
+                                    3 => text.push(0x59),
+                                    4 => text.extend_from_slice(&[0x41, 0x58]),
+                                    5 => text.extend_from_slice(&[0x41, 0x59]),
+                                    _ => {}
+                                }
                             }
                         }
                     } else {
@@ -1941,14 +1966,24 @@ pub fn compile_project(
                             text.extend_from_slice(&[0x48, 0x8B, 0x84, 0x24]);
                             text.write_i32::<LittleEndian>(src_off).unwrap();
 
-                            match i {
-                                0 => text.extend_from_slice(&[0x48, 0x89, 0xC7]),
-                                1 => text.extend_from_slice(&[0x48, 0x89, 0xC6]),
-                                2 => text.extend_from_slice(&[0x48, 0x89, 0xC2]),
-                                3 => text.extend_from_slice(&[0x48, 0x89, 0xC1]),
-                                4 => text.extend_from_slice(&[0x49, 0x89, 0xC0]),
-                                5 => text.extend_from_slice(&[0x49, 0x89, 0xC1]),
-                                _ => {}
+                            if target.contains("windows") {
+                                match i {
+                                    0 => text.extend_from_slice(&[0x48, 0x89, 0xC1]),
+                                    1 => text.extend_from_slice(&[0x48, 0x89, 0xC2]),
+                                    2 => text.extend_from_slice(&[0x49, 0x89, 0xC0]),
+                                    3 => text.extend_from_slice(&[0x49, 0x89, 0xC1]),
+                                    _ => {}
+                                }
+                            } else {
+                                match i {
+                                    0 => text.extend_from_slice(&[0x48, 0x89, 0xC7]),
+                                    1 => text.extend_from_slice(&[0x48, 0x89, 0xC6]),
+                                    2 => text.extend_from_slice(&[0x48, 0x89, 0xC2]),
+                                    3 => text.extend_from_slice(&[0x48, 0x89, 0xC1]),
+                                    4 => text.extend_from_slice(&[0x49, 0x89, 0xC0]),
+                                    5 => text.extend_from_slice(&[0x49, 0x89, 0xC1]),
+                                    _ => {}
+                                }
                             }
                         }
 
@@ -1962,6 +1997,11 @@ pub fn compile_project(
                             text.push(0x50);
                         }
                     }
+                }
+
+                if target.contains("windows") {
+                    text.extend_from_slice(&[0x48, 0x83, 0xEC, 0x20]);
+                    call_shadow_alloc = 32;
                 }
 
                 if let Some(lbl) = func_label_map.get(&name) {
@@ -2005,6 +2045,11 @@ pub fn compile_project(
                             .unwrap();
                     }
 
+                    if call_shadow_alloc > 0 {
+                        text.extend_from_slice(&[0x48, 0x81, 0xC4]);
+                        text.write_i32::<LittleEndian>(call_shadow_alloc).unwrap();
+                    }
+
                     if scratch_alloc > 0 {
                         text.extend_from_slice(&[0x48, 0x81, 0xC4]);
                         text.write_i32::<LittleEndian>(scratch_alloc).unwrap();
@@ -2014,6 +2059,9 @@ pub fn compile_project(
                         text.extend_from_slice(&[0x48, 0x81, 0xC4]);
                         text.write_i32::<LittleEndian>(nargs as i32 * 8).unwrap();
                     }
+                } else if call_shadow_alloc > 0 {
+                    text.extend_from_slice(&[0x48, 0x81, 0xC4]);
+                    text.write_i32::<LittleEndian>(call_shadow_alloc).unwrap();
                 }
 
                 text.push(0x50);

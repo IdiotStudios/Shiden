@@ -129,7 +129,7 @@ Licensed under the MIT License. See the `LICENSE` file for details.
 
 ## AI Notice
 
-Used AI for inline code completions and for documentation writing.
+Used AI for inline code completions and for documentation writing. Also for debugging.
 
 ## Extra
 
