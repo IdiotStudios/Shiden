@@ -454,14 +454,7 @@ pub fn write_executable_from_sections(
 
                     let file_off = pe.len() + off;
                     file_bytes[file_off..file_off + 8].copy_from_slice(&le);
-                } else if s == "__argv_store" {
-                    let off = r.offset;
-                    let argv_store_va = IMAGE_BASE + rdata_rva + (argv_store_ro_offset as u64);
-                    let le = argv_store_va.to_le_bytes();
-                    text[off..off + 8].copy_from_slice(&le);
-
-                    let file_off = pe.len() + off;
-                    file_bytes[file_off..file_off + 8].copy_from_slice(&le);
+                } else {
                 }
             }
         }
