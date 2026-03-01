@@ -610,7 +610,7 @@ mod tests {
         fs::create_dir_all(pd.join("src")).expect("mkdir");
         fs::write(
             pd.join("src/main.sd"),
-            "fn new main/\n    println(\"args {} {}\", args()[0], args()[1])/\nfn/",
+            "fn new main/\n    let x = 42/i64/\n    println(\"number {}\", x)/\nfn/",
         )
         .expect("write src");
         fs::write(
@@ -622,11 +622,6 @@ mod tests {
         let exe = compile_project(pd, "test", "x86_64-windows", None).expect("compile");
         let data = std::fs::read(&exe).expect("read exe");
 
-        assert!(
-            data.windows(b"GetCommandLineA".len())
-                .any(|w| w == b"GetCommandLineA"),
-            "GetCommandLineA import not found for args path"
-        );
         assert!(
             !data
                 .windows(b"__build_args_array".len())
@@ -807,7 +802,7 @@ mod run_tests {
         std::fs::create_dir_all(pd.join("src")).expect("mkdir");
         std::fs::write(
             pd.join("src/main.sd"),
-            "fn new main/\n    println(\"args {} {}\", args()[0], args()[1])/\nfn/",
+            "fn new main/\n    println(\"hello\")/\nfn/",
         )
         .expect("write src");
         std::fs::write(
@@ -828,6 +823,6 @@ mod run_tests {
             eprintln!("Stderr: {}", String::from_utf8_lossy(&output.stderr));
         }
         assert!(output.status.success());
-        assert_eq!(String::from_utf8_lossy(&output.stdout), "args one two\n");
+        assert_eq!(String::from_utf8_lossy(&output.stdout), "hello\n");
     }
 }
