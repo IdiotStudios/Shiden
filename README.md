@@ -73,13 +73,15 @@ Shiden supports compiling for multiple platforms. The compiler automatically det
 
 ### Soon to be Supported
 
-* **WebAssembly** (`wasm`)
-* **ARM** (`arm`)
-* **32-bit x86** (`x86`)
-* **RISC-V** (`riscv`)
-* **PowerPC** (`ppc`)
-* **Mobile (iOS/Android)** (`mobile`)
-* **Operating System** (`iso`)
+* **WebAssembly** (`wasm`) - compile for web browsers and wasm runtimes
+* **ARM** (`arm`) - compile for arm based systems
+* **32-bit x86** (`x86`) - will compile it for all platforms that support it if specified.
+* **RISC-V** (`riscv`) - compile for RISC-V architecture
+* **PowerPC** (`ppc`) - compile for ppc (xbox 360)
+* **Mobile (iOS/Android)** (`mobile`) - compile for mobile platforms
+* **Operating System** (`iso`) - compile a custom OS
+* **Embedded** (`embedded`) - compile for microcontrollers and embedded devices
+* **Drivers** (`drivers`) - compile kernel modules and device drivers
 
 ### Configure Targets
 
