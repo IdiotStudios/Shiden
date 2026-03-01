@@ -708,6 +708,47 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn compile_args_and_run_with_wine() {
+        let td = tempdir().expect("tempdir");
+        let pd = td.path();
+        fs::create_dir_all(pd.join("src")).expect("mkdir");
+        fs::write(
+            pd.join("src/main.sd"),
+            "fn new main/\n    println(\"args {} {}\", args()[0], args()[1])/\nfn/",
+        )
+        .expect("write src");
+        fs::write(
+            pd.join("shiden.toml"),
+            r#"[project]\nname = "test"\n[build]\ntargets = ["x86_64-windows"]"#,
+        )
+        .expect("write mf");
+
+        let exe = compile_project(pd, "test", "x86_64-windows", None).expect("compile");
+
+        let output = std::process::Command::new("wine")
+            .arg(&exe)
+            .arg("one")
+            .arg("two")
+            .output();
+
+        if let Ok(output) = output {
+            if !output.status.success() {
+                eprintln!("Exit status: {:?}", output.status);
+                eprintln!("Stdout: {}", String::from_utf8_lossy(&output.stdout));
+                eprintln!("Stderr: {}", String::from_utf8_lossy(&output.stderr));
+            }
+            assert!(output.status.success(), "executable failed");
+            assert_eq!(
+                String::from_utf8_lossy(&output.stdout),
+                "args one two\n",
+                "incorrect output"
+            );
+        } else {
+            eprintln!("Wine not available, skipping execution test");
+        }
+    }
 }
 
 #[cfg(test)]
