@@ -5,4 +5,4 @@ license = "MIT"
 
 [build]
 opt_level = 3
-targets = ["x86_64-linux"]
+targets = ["x86_64-linux", "x86_64-windows"]
