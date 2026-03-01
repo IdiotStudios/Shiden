@@ -3,7 +3,10 @@ const GITHUB_BRANCH = 'main';
 const DOCS_PATH = 'docs';
 
 const CATEGORIES = {
-  'Getting Started': ['index'],
+  'Getting Started': [
+    'index',
+    'installation'
+  ],
   'Language': [
     'syntax',
     'types',
