@@ -1402,7 +1402,7 @@ pub fn compile_project(
         let copy_arg_start = text.len();
         text.extend_from_slice(&[0x41, 0x8A, 0x00]);
         text.extend_from_slice(&[0x3C, 0x00]);
-        text.extend_from_slice(&[0x74, 0x0C]);
+        text.extend_from_slice(&[0x74, 0x0E]);
         text.extend_from_slice(&[0x3C, 0x20]);
         text.extend_from_slice(&[0x74, 0x08]);
         text.extend_from_slice(&[0x41, 0x88, 0x03]);
@@ -1417,6 +1417,11 @@ pub fn compile_project(
         text.extend_from_slice(&[0xEB]);
         let _skip_spaces_jump = text.len();
         text.push(((skip_spaces_start as i8).wrapping_sub(text.len() as i8)).wrapping_sub(1) as u8);
+
+        text.extend_from_slice(&[0x41, 0xC6, 0x03, 0x00]);
+        text.extend_from_slice(&[0xEB]);
+        let done_from_null_offset = text.len();
+        text.push(0);
 
         let done_label = text.len();
         text.extend_from_slice(&[0x48, 0xB8]);
@@ -1439,6 +1444,8 @@ pub fn compile_project(
         text[back_to_skip_spaces] = offset as u8;
         let offset = (copy_arg_start as i8).wrapping_sub((back_to_copy + 1) as i8);
         text[back_to_copy] = offset as u8;
+        let offset = (done_label as i8).wrapping_sub((done_from_null_offset) as i8);
+        text[done_from_null_offset - 1] = offset as u8;
 
         gcl_reloc_offset = Some(gcl_off);
         argv_store_reloc_offset = Some(argv_store_off);
