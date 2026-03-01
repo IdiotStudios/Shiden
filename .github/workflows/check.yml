@@ -71,8 +71,9 @@ jobs:
         with:
           toolchain: stable
 
-      - name: Run cargo build
-        run: cargo build --release
+      # Useless as runnning it compiles anyway.
+      #- name: Run cargo build
+      #  run: cargo build --release
 
       - name: Run Shiden Brainfuck interpreter
         run: cargo run -- run examples/brainfuck
