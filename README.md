@@ -4,10 +4,6 @@ Shiden is a high-performance, ahead-of-time compiled programming language built 
 
 Shiden has a .sd file format
 
-## AI Notice
-
-Used AI for inline code completions and for documentation writing.
-
 ## Some things we have
 
 [VSCode-Extension](https://marketplace.visualstudio.com/items?itemName=IdiotStudios.shiden)  
@@ -35,6 +31,10 @@ Shiden has built in [libraries](src/libraries).
 Which are:
 
 * [Filesystem](src/libraries/filesystem)
+* [Networking](src/libraries/networking)
+* [Rendering](src/libraries/rendering)
+* [Math](src/libraries/math)
+
 
 ### Library Architecture
 
@@ -126,6 +126,10 @@ If you do wanna contribute <3 then feel free to create issues or pull requests! 
 ## License
 
 Licensed under the MIT License. See the `LICENSE` file for details.
+
+## AI Notice
+
+Used AI for inline code completions and for documentation writing.
 
 ## Extra
 

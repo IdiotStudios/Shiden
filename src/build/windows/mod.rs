@@ -742,6 +742,11 @@ mod run_tests {
             .arg("two")
             .output()
             .expect("run exe");
+        if !output.status.success() {
+            eprintln!("Exit status: {:?}", output.status);
+            eprintln!("Stdout: {}", String::from_utf8_lossy(&output.stdout));
+            eprintln!("Stderr: {}", String::from_utf8_lossy(&output.stderr));
+        }
         assert!(output.status.success());
         assert_eq!(String::from_utf8_lossy(&output.stdout), "args one two\n");
     }

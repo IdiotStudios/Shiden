@@ -694,7 +694,10 @@ pub fn compile_project(
                                     continue;
                                 }
 
-                                if let Expr::Index { expr: arr, index: _ } = arg_expr
+                                if let Expr::Index {
+                                    expr: arr,
+                                    index: _,
+                                } = arg_expr
                                     && let Expr::Call {
                                         name,
                                         args: call_args,
@@ -2181,13 +2184,41 @@ pub fn compile_project(
 
         if *name == "heap_alloc" && target.contains("windows") {
             reloc_entries.push(RelocEntry {
-                offset: pos + 15,
+                offset: pos + 14,
                 sym_name: Some(b"GetProcessHeap".to_vec()),
                 _is_call: false,
             });
 
             reloc_entries.push(RelocEntry {
-                offset: pos + 36,
+                offset: pos + 35,
+                sym_name: Some(b"HeapAlloc".to_vec()),
+                _is_call: false,
+            });
+        }
+
+        if *name == "array_new" && target.contains("windows") {
+            reloc_entries.push(RelocEntry {
+                offset: pos + 10,
+                sym_name: Some(b"GetProcessHeap".to_vec()),
+                _is_call: false,
+            });
+
+            reloc_entries.push(RelocEntry {
+                offset: pos + 34,
+                sym_name: Some(b"HeapAlloc".to_vec()),
+                _is_call: false,
+            });
+        }
+
+        if *name == "push" && target.contains("windows") {
+            reloc_entries.push(RelocEntry {
+                offset: pos + 21,
+                sym_name: Some(b"GetProcessHeap".to_vec()),
+                _is_call: false,
+            });
+
+            reloc_entries.push(RelocEntry {
+                offset: pos + 45,
                 sym_name: Some(b"HeapAlloc".to_vec()),
                 _is_call: false,
             });
