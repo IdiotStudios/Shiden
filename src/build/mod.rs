@@ -2171,12 +2171,12 @@ pub fn compile_project(
                 _is_call: false,
             });
             reloc_entries.push(RelocEntry {
-                offset: pos + 69,
+                offset: pos + 68,
                 sym_name: Some(b"__cstr_to_string".to_vec()),
                 _is_call: false,
             });
             reloc_entries.push(RelocEntry {
-                offset: pos + 87,
+                offset: pos + 86,
                 sym_name: Some(b"push".to_vec()),
                 _is_call: false,
             });
