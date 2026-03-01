@@ -21,7 +21,6 @@ jobs:
             const workflows = new Set([
               "check.yml",
               "pages.yml",
-              "release.yml",
             ]);
             const ref = (context.ref || "").replace("refs/heads/", "") || "main";
             const { data } = await github.rest.actions.listRepoWorkflows({
