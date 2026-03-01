@@ -160,6 +160,16 @@ pub fn write_executable_from_sections(
         FILE_ALIGNMENT as u64,
     ) as u32;
 
+    let mut writable_data_patched = writable_data.to_vec();
+    if argv_data_offset + 8 <= writable_data_patched.len() 
+        && argv_store_data_offset < writable_data_patched.len() 
+    {
+        let argv_store_va = IMAGE_BASE + data_rva + (argv_store_data_offset as u64);
+        writable_data_patched[argv_data_offset..argv_data_offset + 8]
+            .copy_from_slice(&argv_store_va.to_le_bytes());
+    }
+    let writable_data = writable_data_patched.as_slice();
+
     for r in reloc_entries.iter() {
         let off = r.offset;
         let sym_name = r
