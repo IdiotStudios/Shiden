@@ -2250,6 +2250,20 @@ pub fn compile_project(
                 _is_call: false,
             });
         }
+
+        if *name == "_print_char" && target.contains("windows") {
+            reloc_entries.push(RelocEntry {
+                offset: pos + 31,
+                sym_name: Some(b"GetStdHandle".to_vec()),
+                _is_call: false,
+            });
+
+            reloc_entries.push(RelocEntry {
+                offset: pos + 62,
+                sym_name: Some(b"WriteFile".to_vec()),
+                _is_call: false,
+            });
+        }
     }
 
     let exe_path = if target.contains("windows") {

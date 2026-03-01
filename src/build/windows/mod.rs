@@ -589,6 +589,12 @@ mod tests {
                 .any(|w| w == b"__cstr_to_string"),
             "__cstr_to_string leaked as unresolved import"
         );
+        assert!(
+            !data
+                .windows(b"_print_char".len())
+                .any(|w| w == b"_print_char"),
+            "_print_char leaked as unresolved import"
+        );
     }
 
     #[test]
