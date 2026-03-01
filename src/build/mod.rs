@@ -1383,131 +1383,23 @@ pub fn compile_project(
             std::collections::HashMap::new();
         let mut jumps: Vec<(usize, &'static str)> = Vec::new();
 
+        
         text.extend_from_slice(&[0x48, 0x83, 0xEC, 0x28]);
-
         text.extend_from_slice(&[0x48, 0xB8]);
         let gcl_off = text.len();
         text.write_u64::<LittleEndian>(0).unwrap();
-        text.extend_from_slice(&[0xFF, 0xD0]);
+        text.extend_from_slice(&[0xFF, 0xD0]);  
         text.extend_from_slice(&[0x48, 0x83, 0xC4, 0x28]);
+        
 
-        text.extend_from_slice(&[0x49, 0x89, 0xC2]);
-
-        text.extend_from_slice(&[0x45, 0x31, 0xC9]);
-
-        text.extend_from_slice(&[0x49, 0xB8]);
-        let argv_store_off = text.len();
-        text.write_u64::<LittleEndian>(0).unwrap();
-
-        text.extend_from_slice(&[0x4D, 0x89, 0xC3]);
-        text.extend_from_slice(&[0x49, 0x81, 0xC3]);
-        text.write_u32::<LittleEndian>(WINDOWS_ARGV_POINTER_BYTES as u32)
-            .unwrap();
-
-        mark_label(&mut labels, "skip_space", &text);
-        text.extend_from_slice(&[0x41, 0x8A, 0x02]);
-        text.extend_from_slice(&[0x3C, 0x00]);
-        emit_jump(&mut text, &mut jumps, 0x74, "done_no_args");
-        text.extend_from_slice(&[0x3C, 0x20]);
-        emit_jump(&mut text, &mut jumps, 0x75, "skip_prog");
-        text.extend_from_slice(&[0x49, 0xFF, 0xC2]);
-        emit_jump(&mut text, &mut jumps, 0xEB, "skip_space");
-
-        mark_label(&mut labels, "skip_prog", &text);
-        text.extend_from_slice(&[0x3C, 0x22]);
-        emit_jump(&mut text, &mut jumps, 0x75, "skip_prog_unquoted");
-        text.extend_from_slice(&[0x49, 0xFF, 0xC2]);
-
-        mark_label(&mut labels, "skip_quoted_prog", &text);
-        text.extend_from_slice(&[0x41, 0x8A, 0x02]);
-        text.extend_from_slice(&[0x3C, 0x00]);
-        emit_jump(&mut text, &mut jumps, 0x74, "done_no_args");
-        text.extend_from_slice(&[0x3C, 0x22]);
-        emit_jump(&mut text, &mut jumps, 0x74, "end_quoted_prog");
-        text.extend_from_slice(&[0x49, 0xFF, 0xC2]);
-        emit_jump(&mut text, &mut jumps, 0xEB, "skip_quoted_prog");
-
-        mark_label(&mut labels, "end_quoted_prog", &text);
-        text.extend_from_slice(&[0x49, 0xFF, 0xC2]);
-        emit_jump(&mut text, &mut jumps, 0xEB, "parse_loop");
-
-        mark_label(&mut labels, "skip_prog_unquoted", &text);
-        mark_label(&mut labels, "skip_unquoted_prog", &text);
-        text.extend_from_slice(&[0x41, 0x8A, 0x02]);
-        text.extend_from_slice(&[0x3C, 0x00]);
-        emit_jump(&mut text, &mut jumps, 0x74, "done_no_args");
-        text.extend_from_slice(&[0x3C, 0x20]);
-        emit_jump(&mut text, &mut jumps, 0x74, "parse_loop");
-        text.extend_from_slice(&[0x49, 0xFF, 0xC2]);
-        emit_jump(&mut text, &mut jumps, 0xEB, "skip_unquoted_prog");
-
-        mark_label(&mut labels, "parse_loop", &text);
-        mark_label(&mut labels, "skip_spaces_args", &text);
-        text.extend_from_slice(&[0x41, 0x8A, 0x02]);
-        text.extend_from_slice(&[0x3C, 0x00]);
-        emit_jump(&mut text, &mut jumps, 0x74, "done");
-        text.extend_from_slice(&[0x3C, 0x20]);
-        emit_jump(&mut text, &mut jumps, 0x75, "token_start");
-        text.extend_from_slice(&[0x49, 0xFF, 0xC2]);
-        emit_jump(&mut text, &mut jumps, 0xEB, "skip_spaces_args");
-
-        mark_label(&mut labels, "token_start", &text);
-        text.extend_from_slice(&[0x49, 0x83, 0xF9, WINDOWS_ARGV_POINTER_SLOTS as u8]);
-        emit_jump(&mut text, &mut jumps, 0x7D, "done");
-        text.extend_from_slice(&[0x4F, 0x89, 0x1C, 0xC8]);
-
-        mark_label(&mut labels, "token_advance", &text);
-        text.extend_from_slice(&[0x41, 0x8A, 0x02]);
-        text.extend_from_slice(&[0x3C, 0x00]);
-        emit_jump(&mut text, &mut jumps, 0x74, "token_end");
-        text.extend_from_slice(&[0x3C, 0x20]);
-        emit_jump(&mut text, &mut jumps, 0x74, "token_end_space");
-        text.extend_from_slice(&[0x41, 0x88, 0x03]);
-        text.extend_from_slice(&[0x49, 0xFF, 0xC3]);
-        text.extend_from_slice(&[0x49, 0xFF, 0xC2]);
-        emit_jump(&mut text, &mut jumps, 0xEB, "token_advance");
-
-        mark_label(&mut labels, "token_end_space", &text);
-        text.extend_from_slice(&[0x41, 0xC6, 0x03, 0x00]);
-        text.extend_from_slice(&[0x49, 0xFF, 0xC3]);
-        text.extend_from_slice(&[0x49, 0xFF, 0xC2]);
-        text.extend_from_slice(&[0x49, 0xFF, 0xC1]);
-        emit_jump(&mut text, &mut jumps, 0xEB, "parse_loop");
-
-        mark_label(&mut labels, "token_end", &text);
-        text.extend_from_slice(&[0x41, 0xC6, 0x03, 0x00]);
-        text.extend_from_slice(&[0x49, 0xFF, 0xC3]);
-        text.extend_from_slice(&[0x49, 0xFF, 0xC1]);
-        emit_jump(&mut text, &mut jumps, 0xEB, "done");
-
-        mark_label(&mut labels, "done_no_args", &text);
-        mark_label(&mut labels, "done", &text);
-        text.extend_from_slice(&[0x48, 0xB9]);
-        let argc_store_off = text.len();
-        text.write_u64::<LittleEndian>(0).unwrap();
-        text.extend_from_slice(&[0x4C, 0x89, 0x09]);
-
-        text.extend_from_slice(&[0x48, 0xB9]);
-        let argv_store_ptr_off = text.len();
-        text.write_u64::<LittleEndian>(0).unwrap();
-        text.extend_from_slice(&[0x4C, 0x89, 0x01]);
-
-        for (pos, label) in jumps {
-            let target = *labels
-                .get(label)
-                .ok_or_else(|| format!("missing label {} in windows arg prologue", label))?;
-            let rel = (target as i64) - ((pos as i64) + 4);
-            if rel < (i32::MIN as i64) || rel > (i32::MAX as i64) {
-                return Err(format!("jump out of range for {}: {}", label, rel));
-            }
-            let rel_bytes = (rel as i32).to_le_bytes();
-            text[pos..pos + 4].copy_from_slice(&rel_bytes);
+        for (_pos, _label) in jumps {
+            
         }
 
         gcl_reloc_offset = Some(gcl_off);
-        argv_store_reloc_offset = Some(argv_store_off);
-        argc_reloc_offset = Some(argc_store_off);
-        argv_reloc_offset = Some(argv_store_ptr_off);
+        argv_store_reloc_offset = None;  
+        argc_reloc_offset = None;  
+        argv_reloc_offset = None;  
     } else {
         text.extend_from_slice(&[0x48, 0x8B, 0x04, 0x24]);
 
