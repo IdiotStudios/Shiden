@@ -1213,16 +1213,27 @@ pub fn compile_project(
     const WINDOWS_ARGV_STRING_BYTES: usize = 4096;
     const WINDOWS_ARGV_STORE_BYTES: usize = WINDOWS_ARGV_POINTER_BYTES + WINDOWS_ARGV_STRING_BYTES;
 
-    let argc_ro_offset = rodata.len();
-    rodata.extend_from_slice(&[0u8; 16]);
-    let argv_ro_offset = argc_ro_offset + 8;
-    let argv_store_offset = if target.contains("windows") {
-        let offset = rodata.len();
-        rodata.resize(rodata.len() + WINDOWS_ARGV_STORE_BYTES, 0);
-        offset
+    let mut writable_data = Vec::new();
+    let mut argc_data_offset = 0;
+    let mut argv_data_offset = 0;
+    let mut argv_store_offset = 0;
+
+    let argc_ro_offset;
+    let argv_ro_offset;
+
+    if target.contains("windows") {
+        argc_data_offset = writable_data.len();
+        writable_data.extend_from_slice(&[0u8; 16]);
+        argv_data_offset = argc_data_offset + 8;
+        argv_store_offset = writable_data.len();
+        writable_data.resize(writable_data.len() + WINDOWS_ARGV_STORE_BYTES, 0);
+        argc_ro_offset = 0;
+        argv_ro_offset = 0;
     } else {
-        0
-    };
+        argc_ro_offset = rodata.len();
+        rodata.extend_from_slice(&[0u8; 16]);
+        argv_ro_offset = argc_ro_offset + 8;
+    }
 
     let rodata_id = data_id;
     let rodata_offset = obj.append_section_data(rodata_id, &rodata, 1);
@@ -1242,42 +1253,69 @@ pub fn compile_project(
         obj.add_symbol(sym);
     }
 
-    let argc_sym = Symbol {
-        name: b"__argc".to_vec(),
-        value: (argc_ro_offset as u64) + rodata_offset,
-        size: 8,
-        kind: object::SymbolKind::Data,
-        scope: SymbolScope::Linkage,
-        weak: false,
-        section: SymbolSection::Section(rodata_id),
-        flags: object::SymbolFlags::None,
-    };
-    obj.add_symbol(argc_sym);
-
-    let argv_sym = Symbol {
-        name: b"__argv".to_vec(),
-        value: (argv_ro_offset as u64) + rodata_offset,
-        size: 8,
-        kind: object::SymbolKind::Data,
-        scope: SymbolScope::Linkage,
-        weak: false,
-        section: SymbolSection::Section(rodata_id),
-        flags: object::SymbolFlags::None,
-    };
-    obj.add_symbol(argv_sym);
-
     if target.contains("windows") {
+        let writable_section_id = obj.section_id(StandardSection::Data);
+        let writable_offset = obj.append_section_data(writable_section_id, &writable_data, 8);
+
+        let argc_sym = Symbol {
+            name: b"__argc".to_vec(),
+            value: (argc_data_offset as u64) + writable_offset,
+            size: 8,
+            kind: object::SymbolKind::Data,
+            scope: SymbolScope::Linkage,
+            weak: false,
+            section: SymbolSection::Section(writable_section_id),
+            flags: object::SymbolFlags::None,
+        };
+        obj.add_symbol(argc_sym);
+
+        let argv_sym = Symbol {
+            name: b"__argv".to_vec(),
+            value: (argv_data_offset as u64) + writable_offset,
+            size: 8,
+            kind: object::SymbolKind::Data,
+            scope: SymbolScope::Linkage,
+            weak: false,
+            section: SymbolSection::Section(writable_section_id),
+            flags: object::SymbolFlags::None,
+        };
+        obj.add_symbol(argv_sym);
+
         let argv_store_sym = Symbol {
             name: b"__argv_store".to_vec(),
-            value: (argv_store_offset as u64) + rodata_offset,
+            value: (argv_store_offset as u64) + writable_offset,
             size: WINDOWS_ARGV_STORE_BYTES as u64,
+            kind: object::SymbolKind::Data,
+            scope: SymbolScope::Linkage,
+            weak: false,
+            section: SymbolSection::Section(writable_section_id),
+            flags: object::SymbolFlags::None,
+        };
+        obj.add_symbol(argv_store_sym);
+    } else {
+        let argc_sym = Symbol {
+            name: b"__argc".to_vec(),
+            value: (argc_ro_offset as u64) + rodata_offset,
+            size: 8,
             kind: object::SymbolKind::Data,
             scope: SymbolScope::Linkage,
             weak: false,
             section: SymbolSection::Section(rodata_id),
             flags: object::SymbolFlags::None,
         };
-        obj.add_symbol(argv_store_sym);
+        obj.add_symbol(argc_sym);
+
+        let argv_sym = Symbol {
+            name: b"__argv".to_vec(),
+            value: (argv_ro_offset as u64) + rodata_offset,
+            size: 8,
+            kind: object::SymbolKind::Data,
+            scope: SymbolScope::Linkage,
+            weak: false,
+            section: SymbolSection::Section(rodata_id),
+            flags: object::SymbolFlags::None,
+        };
+        obj.add_symbol(argv_sym);
     }
 
     let print_sym = Symbol {
@@ -2334,13 +2372,14 @@ pub fn compile_project(
             target,
             &mut text,
             &rodata,
+            &writable_data,
             &string_positions,
             &helper_pos,
             &reloc_entries,
             &func_label_map,
             &label_positions,
-            argc_ro_offset,
-            argv_ro_offset,
+            argc_data_offset,
+            argv_data_offset,
             argv_store_offset,
         )?
     } else {

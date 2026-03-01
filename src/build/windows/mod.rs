@@ -9,14 +9,15 @@ pub fn write_executable_from_sections(
     _target: &str,
     text: &mut [u8],
     rodata: &[u8],
+    writable_data: &[u8],
     string_positions: &[usize],
     helper_pos: &std::collections::HashMap<String, usize>,
     reloc_entries: &[RelocEntry],
     func_label_map: &std::collections::HashMap<String, usize>,
     label_positions: &std::collections::HashMap<usize, usize>,
-    argc_ro_offset: usize,
-    argv_ro_offset: usize,
-    argv_store_ro_offset: usize,
+    argc_data_offset: usize,
+    argv_data_offset: usize,
+    argv_store_data_offset: usize,
 ) -> Result<PathBuf, String> {
     const IMAGE_BASE: u64 = 0x0014_0000_0000_u64;
     const SECTION_ALIGNMENT: u32 = 0x1000;
@@ -143,16 +144,19 @@ pub fn write_executable_from_sections(
         (FILE_ALIGNMENT as usize) - (rodata_len % (FILE_ALIGNMENT as usize))
     };
     let rdata_vsize = (rodata_len + pad_rdata + import_data.len()) as u64;
+    let data_vsize = writable_data.len() as u64;
 
     let text_raw_size = align_up(text_vsize, FILE_ALIGNMENT as u64) as u32;
     let rdata_raw_size = align_up(rdata_vsize, FILE_ALIGNMENT as u64) as u32;
+    let data_raw_size = align_up(data_vsize, FILE_ALIGNMENT as u64) as u32;
 
     let text_rva = SECTION_ALIGNMENT as u64;
     let rdata_rva = text_rva + align_up(text_vsize, SECTION_ALIGNMENT as u64);
+    let data_rva = rdata_rva + align_up(rdata_vsize, SECTION_ALIGNMENT as u64);
 
-    let size_of_image = (rdata_rva + align_up(rdata_vsize, SECTION_ALIGNMENT as u64)) as u32;
+    let size_of_image = (data_rva + align_up(data_vsize, SECTION_ALIGNMENT as u64)) as u32;
     let size_of_headers = align_up(
-        (HEADER_NT_OFFSET as u64) + 4 + 20 + 0xF0 + (2 * 40),
+        (HEADER_NT_OFFSET as u64) + 4 + 20 + 0xF0 + (3 * 40),
         FILE_ALIGNMENT as u64,
     ) as u32;
 
@@ -182,22 +186,22 @@ pub fn write_executable_from_sections(
                 continue;
             }
             if sym == "__argc" {
-                let pos_in_rdata = argc_ro_offset as u64;
-                let va = IMAGE_BASE + rdata_rva + pos_in_rdata;
+                let pos_in_data = argc_data_offset as u64;
+                let va = IMAGE_BASE + data_rva + pos_in_data;
                 let le = va.to_le_bytes();
                 text[off..off + 8].copy_from_slice(&le);
                 continue;
             }
             if sym == "__argv" {
-                let pos_in_rdata = argv_ro_offset as u64;
-                let va = IMAGE_BASE + rdata_rva + pos_in_rdata;
+                let pos_in_data = argv_data_offset as u64;
+                let va = IMAGE_BASE + data_rva + pos_in_data;
                 let le = va.to_le_bytes();
                 text[off..off + 8].copy_from_slice(&le);
                 continue;
             }
             if sym == "__argv_store" {
-                let pos_in_rdata = argv_store_ro_offset as u64;
-                let va = IMAGE_BASE + rdata_rva + pos_in_rdata;
+                let pos_in_data = argv_store_data_offset as u64;
+                let va = IMAGE_BASE + data_rva + pos_in_data;
                 let le = va.to_le_bytes();
                 text[off..off + 8].copy_from_slice(&le);
                 continue;
@@ -232,7 +236,7 @@ pub fn write_executable_from_sections(
     pe.extend_from_slice(&[b'P', b'E', 0, 0]);
 
     pe.extend_from_slice(&0x8664u16.to_le_bytes());
-    pe.extend_from_slice(&2u16.to_le_bytes());
+    pe.extend_from_slice(&3u16.to_le_bytes());
     pe.extend_from_slice(&0u32.to_le_bytes());
     pe.extend_from_slice(&0u32.to_le_bytes());
     pe.extend_from_slice(&0u32.to_le_bytes());
@@ -307,6 +311,21 @@ pub fn write_executable_from_sections(
     pe.extend_from_slice(&0u16.to_le_bytes());
     pe.extend_from_slice(&0u16.to_le_bytes());
 
+    pe.extend_from_slice(&(0xC0000040u32).to_le_bytes());
+
+    let mut sh_name3 = [0u8; 8];
+    sh_name3[..5].copy_from_slice(b".data");
+    pe.extend_from_slice(&sh_name3);
+    pe.extend_from_slice(&(data_vsize as u32).to_le_bytes());
+    pe.extend_from_slice(&(data_rva as u32).to_le_bytes());
+    pe.extend_from_slice(&(data_raw_size as u32).to_le_bytes());
+    pe.extend_from_slice(
+        &((size_of_headers as u32) + text_raw_size + rdata_raw_size).to_le_bytes(),
+    );
+    pe.extend_from_slice(&0u32.to_le_bytes());
+    pe.extend_from_slice(&0u32.to_le_bytes());
+    pe.extend_from_slice(&0u16.to_le_bytes());
+    pe.extend_from_slice(&0u16.to_le_bytes());
     pe.extend_from_slice(&(0xC0000040u32).to_le_bytes());
 
     if (pe.len() as u32) < size_of_headers {
@@ -440,7 +459,7 @@ pub fn write_executable_from_sections(
                     file_bytes[file_off..file_off + 8].copy_from_slice(&le);
                 } else if s == "__argc" {
                     let off = r.offset;
-                    let argc_va = IMAGE_BASE + rdata_rva + (argc_ro_offset as u64);
+                    let argc_va = IMAGE_BASE + data_rva + (argc_data_offset as u64);
                     let le = argc_va.to_le_bytes();
                     text[off..off + 8].copy_from_slice(&le);
 
@@ -448,7 +467,7 @@ pub fn write_executable_from_sections(
                     file_bytes[file_off..file_off + 8].copy_from_slice(&le);
                 } else if s == "__argv" {
                     let off = r.offset;
-                    let argv_va = IMAGE_BASE + rdata_rva + (argv_ro_offset as u64);
+                    let argv_va = IMAGE_BASE + data_rva + (argv_data_offset as u64);
                     let le = argv_va.to_le_bytes();
                     text[off..off + 8].copy_from_slice(&le);
 
@@ -463,6 +482,12 @@ pub fn write_executable_from_sections(
         (size_of_headers as usize) + (text_raw_size as usize) + (rdata_raw_size as usize);
     if file_bytes.len() < expected_size {
         file_bytes.resize(expected_size, 0);
+    }
+
+    file_bytes.extend_from_slice(writable_data);
+    let pad_data = (FILE_ALIGNMENT as usize) - (writable_data.len() % FILE_ALIGNMENT as usize);
+    if pad_data != FILE_ALIGNMENT as usize {
+        file_bytes.resize(file_bytes.len() + pad_data, 0);
     }
 
     std::fs::create_dir_all(out_dir).map_err(|e| format!("failed to create out dir: {}", e))?;
