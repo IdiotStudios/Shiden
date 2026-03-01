@@ -1343,13 +1343,13 @@ pub fn compile_project(
             std::collections::HashMap::new();
         let mut jumps: Vec<(usize, &'static str)> = Vec::new();
 
-        text.extend_from_slice(&[0x48, 0x83, 0xEC, 0x20]);
+        text.extend_from_slice(&[0x48, 0x83, 0xEC, 0x28]);
 
         text.extend_from_slice(&[0x48, 0xB8]);
         let gcl_off = text.len();
         text.write_u64::<LittleEndian>(0).unwrap();
         text.extend_from_slice(&[0xFF, 0xD0]);
-        text.extend_from_slice(&[0x48, 0x83, 0xC4, 0x20]);
+        text.extend_from_slice(&[0x48, 0x83, 0xC4, 0x28]);
 
         text.extend_from_slice(&[0x49, 0x89, 0xC2]);
 
@@ -2091,12 +2091,10 @@ pub fn compile_project(
     if target.contains("windows") {
         text.extend_from_slice(&[0x31, 0xC9]);
 
-        text.extend_from_slice(&[0x48, 0x83, 0xEC, 0x20]);
-
         text.extend_from_slice(&[0x48, 0xB8]);
         let exit_off = text.len();
         text.write_u64::<LittleEndian>(0).unwrap();
-        text.extend_from_slice(&[0xFF, 0xD0]);
+        text.extend_from_slice(&[0xFF, 0xE0]);
 
         reloc_entries.push(RelocEntry {
             offset: exit_off,
