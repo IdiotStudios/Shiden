@@ -2158,32 +2158,45 @@ pub fn compile_project(
         }
 
         if *name == "__build_args_array" {
-            reloc_entries.push(RelocEntry {
-                offset: pos + 2,
-                sym_name: Some(b"__argc".to_vec()),
-                _is_call: false,
-            });
-            reloc_entries.push(RelocEntry {
-                offset: pos + 15,
-                sym_name: Some(b"__argv".to_vec()),
-                _is_call: false,
-            });
+            if target.contains("windows") {
+                reloc_entries.push(RelocEntry {
+                    offset: pos + 15,
+                    sym_name: Some(b"GetCommandLineA".to_vec()),
+                    _is_call: false,
+                });
+                reloc_entries.push(RelocEntry {
+                    offset: pos + 27,
+                    sym_name: Some(b"array_new".to_vec()),
+                    _is_call: false,
+                });
+            } else {
+                reloc_entries.push(RelocEntry {
+                    offset: pos + 2,
+                    sym_name: Some(b"__argc".to_vec()),
+                    _is_call: false,
+                });
+                reloc_entries.push(RelocEntry {
+                    offset: pos + 15,
+                    sym_name: Some(b"__argv".to_vec()),
+                    _is_call: false,
+                });
 
-            reloc_entries.push(RelocEntry {
-                offset: pos + 41,
-                sym_name: Some(b"array_new".to_vec()),
-                _is_call: false,
-            });
-            reloc_entries.push(RelocEntry {
-                offset: pos + 68,
-                sym_name: Some(b"__cstr_to_string".to_vec()),
-                _is_call: false,
-            });
-            reloc_entries.push(RelocEntry {
-                offset: pos + 86,
-                sym_name: Some(b"push".to_vec()),
-                _is_call: false,
-            });
+                reloc_entries.push(RelocEntry {
+                    offset: pos + 41,
+                    sym_name: Some(b"array_new".to_vec()),
+                    _is_call: false,
+                });
+                reloc_entries.push(RelocEntry {
+                    offset: pos + 71,
+                    sym_name: Some(b"__cstr_to_string".to_vec()),
+                    _is_call: false,
+                });
+                reloc_entries.push(RelocEntry {
+                    offset: pos + 89,
+                    sym_name: Some(b"push".to_vec()),
+                    _is_call: false,
+                });
+            }
         }
 
         if *name == "heap_alloc" && target.contains("windows") {

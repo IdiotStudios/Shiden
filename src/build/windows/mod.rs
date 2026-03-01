@@ -454,7 +454,6 @@ pub fn write_executable_from_sections(
 
                     let file_off = pe.len() + off;
                     file_bytes[file_off..file_off + 8].copy_from_slice(&le);
-                } else {
                 }
             }
         }
