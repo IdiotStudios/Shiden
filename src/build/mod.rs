@@ -1494,8 +1494,12 @@ pub fn compile_project(
     let mut alloc = (locals_count as i64) * 8;
     if target.contains("windows") {
         let rem = alloc % 16;
-        if rem != 0 {
-            alloc += 16 - rem;
+        if rem == 0 {
+            alloc += 8;
+        } else if rem < 8 {
+            alloc += 8 - rem;
+        } else {
+            alloc += 24 - rem;
         }
     } else if alloc % 16 == 0 {
         alloc += 8;
@@ -2091,7 +2095,7 @@ pub fn compile_project(
     if target.contains("windows") {
         text.extend_from_slice(&[0x31, 0xC9]);
 
-        text.extend_from_slice(&[0x48, 0x83, 0xEC, 0x28]);
+        text.extend_from_slice(&[0x48, 0x83, 0xEC, 0x20]);
 
         text.extend_from_slice(&[0x48, 0xB8]);
         let exit_off = text.len();
