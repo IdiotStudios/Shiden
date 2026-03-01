@@ -719,7 +719,6 @@ pub fn compile_project(
                                     lower_expr_to_ir(
                                         arg_expr, &mut res, locals, next_local, next_label,
                                     )?;
-                                    res.push(IrInstr::Call("__cstr_to_string".into(), 1));
                                     res.push(IrInstr::StoreLocal(str_tmp));
                                     res.push(IrInstr::LoadLocal(str_tmp));
                                     res.push(IrInstr::Call("len".into(), 1));
