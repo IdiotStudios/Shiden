@@ -2182,6 +2182,20 @@ pub fn compile_project(
             });
         }
 
+        if *name == "__cstr_to_string" && target.contains("windows") {
+            reloc_entries.push(RelocEntry {
+                offset: pos + 16,
+                sym_name: Some(b"array_new".to_vec()),
+                _is_call: false,
+            });
+
+            reloc_entries.push(RelocEntry {
+                offset: pos + 46,
+                sym_name: Some(b"push".to_vec()),
+                _is_call: false,
+            });
+        }
+
         if *name == "heap_alloc" && target.contains("windows") {
             reloc_entries.push(RelocEntry {
                 offset: pos + 14,
