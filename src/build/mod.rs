@@ -2114,6 +2114,10 @@ pub fn compile_project(
         let pos = text.len();
         text.extend_from_slice(bytes);
         helper_pos.insert(name.to_string(), pos);
+    }
+
+    for (name, _) in helpers.iter() {
+        let pos = helper_pos[*name];
 
         if *name == "__cstr_to_string" {
             reloc_entries.push(RelocEntry {
@@ -2198,13 +2202,13 @@ pub fn compile_project(
 
         if *name == "heap_alloc" && target.contains("windows") {
             reloc_entries.push(RelocEntry {
-                offset: pos + 14,
+                offset: pos + 11,
                 sym_name: Some(b"GetProcessHeap".to_vec()),
                 _is_call: false,
             });
 
             reloc_entries.push(RelocEntry {
-                offset: pos + 35,
+                offset: pos + 31,
                 sym_name: Some(b"HeapAlloc".to_vec()),
                 _is_call: false,
             });
