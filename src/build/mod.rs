@@ -1214,10 +1214,9 @@ pub fn compile_project(
     const WINDOWS_ARGV_STORE_BYTES: usize = WINDOWS_ARGV_POINTER_BYTES + WINDOWS_ARGV_STRING_BYTES;
 
     let mut writable_data = Vec::new();
-    let mut argc_data_offset = 0;
-    let mut argv_data_offset = 0;
-    let mut argv_store_offset = 0;
-
+    let argc_data_offset;
+    let argv_data_offset;
+    let argv_store_offset;
     let argc_ro_offset;
     let argv_ro_offset;
 
@@ -1226,13 +1225,16 @@ pub fn compile_project(
         writable_data.extend_from_slice(&[0u8; 16]);
         argv_data_offset = argc_data_offset + 8;
         argv_store_offset = writable_data.len();
-        writable_data.resize(writable_data.len() + WINDOWS_ARGV_STORE_BYTES, 0);
+        writable_data.resize(argv_store_offset + WINDOWS_ARGV_STORE_BYTES, 0);
         argc_ro_offset = 0;
         argv_ro_offset = 0;
     } else {
         argc_ro_offset = rodata.len();
         rodata.extend_from_slice(&[0u8; 16]);
         argv_ro_offset = argc_ro_offset + 8;
+        argc_data_offset = 0;
+        argv_data_offset = 0;
+        argv_store_offset = 0;
     }
 
     let rodata_id = data_id;
