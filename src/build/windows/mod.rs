@@ -530,6 +530,44 @@ mod tests {
     }
 
     #[test]
+    fn compile_windows_args_path_embeds_args_helpers_on_unix() {
+        let td = tempdir().expect("tempdir");
+        let pd = td.path();
+        fs::create_dir_all(pd.join("src")).expect("mkdir");
+        fs::write(
+            pd.join("src/main.sd"),
+            "fn new main/\n    println(\"args {} {}\", args()[0], args()[1])/\nfn/",
+        )
+        .expect("write src");
+        fs::write(
+            pd.join("shiden.toml"),
+            r#"[project]\nname = "test"\n[build]\ntargets = ["x86_64-windows"]"#,
+        )
+        .expect("write mf");
+
+        let exe = compile_project(pd, "test", "x86_64-windows", None).expect("compile");
+        let data = std::fs::read(&exe).expect("read exe");
+
+        assert!(
+            data.windows(b"GetCommandLineA".len())
+                .any(|w| w == b"GetCommandLineA"),
+            "GetCommandLineA import not found for args path"
+        );
+        assert!(
+            !data
+                .windows(b"__build_args_array".len())
+                .any(|w| w == b"__build_args_array"),
+            "__build_args_array leaked as unresolved import"
+        );
+        assert!(
+            !data
+                .windows(b"__cstr_to_string".len())
+                .any(|w| w == b"__cstr_to_string"),
+            "__cstr_to_string leaked as unresolved import"
+        );
+    }
+
+    #[test]
     fn compile_windows_network_helpers_on_unix() {
         let td = tempdir().expect("tempdir");
         let pd = td.path();

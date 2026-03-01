@@ -694,6 +694,53 @@ pub fn compile_project(
                                     continue;
                                 }
 
+                                if let Expr::Index { expr: arr, index: _ } = arg_expr
+                                    && let Expr::Call {
+                                        name,
+                                        args: call_args,
+                                    } = arr.as_ref()
+                                    && name == "args"
+                                    && call_args.is_empty()
+                                {
+                                    let str_tmp = *next_local;
+                                    *next_local += 1;
+                                    let len_tmp = *next_local;
+                                    *next_local += 1;
+                                    let idx_tmp = *next_local;
+                                    *next_local += 1;
+                                    let loop_lbl = *next_label;
+                                    *next_label += 1;
+                                    let done_lbl = *next_label;
+                                    *next_label += 1;
+
+                                    lower_expr_to_ir(
+                                        arg_expr, &mut res, locals, next_local, next_label,
+                                    )?;
+                                    res.push(IrInstr::Call("__cstr_to_string".into(), 1));
+                                    res.push(IrInstr::StoreLocal(str_tmp));
+                                    res.push(IrInstr::LoadLocal(str_tmp));
+                                    res.push(IrInstr::Call("len".into(), 1));
+                                    res.push(IrInstr::StoreLocal(len_tmp));
+                                    res.push(IrInstr::PushConst(0));
+                                    res.push(IrInstr::StoreLocal(idx_tmp));
+                                    res.push(IrInstr::Label(loop_lbl));
+                                    res.push(IrInstr::LoadLocal(idx_tmp));
+                                    res.push(IrInstr::LoadLocal(len_tmp));
+                                    res.push(IrInstr::Compare(crate::syntax::BinOp::Lt));
+                                    res.push(IrInstr::JumpIfFalse(done_lbl));
+                                    res.push(IrInstr::LoadLocal(str_tmp));
+                                    res.push(IrInstr::LoadLocal(idx_tmp));
+                                    res.push(IrInstr::Call("array_get".into(), 2));
+                                    res.push(IrInstr::EmitChar);
+                                    res.push(IrInstr::LoadLocal(idx_tmp));
+                                    res.push(IrInstr::PushConst(1));
+                                    res.push(IrInstr::BinOp(crate::syntax::BinOp::Add));
+                                    res.push(IrInstr::StoreLocal(idx_tmp));
+                                    res.push(IrInstr::Jump(loop_lbl));
+                                    res.push(IrInstr::Label(done_lbl));
+                                    continue;
+                                }
+
                                 if let Expr::Identifier(id) = arg_expr {
                                     if matches!(types.get(id).map(String::as_str), Some("str")) {
                                         lower_expr_to_ir(
@@ -1159,12 +1206,17 @@ pub fn compile_project(
         string_positions.push(offset);
     }
 
+    const WINDOWS_ARGV_POINTER_SLOTS: usize = 64;
+    const WINDOWS_ARGV_POINTER_BYTES: usize = WINDOWS_ARGV_POINTER_SLOTS * 8;
+    const WINDOWS_ARGV_STRING_BYTES: usize = 4096;
+    const WINDOWS_ARGV_STORE_BYTES: usize = WINDOWS_ARGV_POINTER_BYTES + WINDOWS_ARGV_STRING_BYTES;
+
     let argc_ro_offset = rodata.len();
     rodata.extend_from_slice(&[0u8; 16]);
     let argv_ro_offset = argc_ro_offset + 8;
     let argv_store_offset = if target.contains("windows") {
         let offset = rodata.len();
-        rodata.resize(rodata.len() + (8 * 64), 0);
+        rodata.resize(rodata.len() + WINDOWS_ARGV_STORE_BYTES, 0);
         offset
     } else {
         0
@@ -1216,7 +1268,7 @@ pub fn compile_project(
         let argv_store_sym = Symbol {
             name: b"__argv_store".to_vec(),
             value: (argv_store_offset as u64) + rodata_offset,
-            size: (8 * 64) as u64,
+            size: WINDOWS_ARGV_STORE_BYTES as u64,
             kind: object::SymbolKind::Data,
             scope: SymbolScope::Linkage,
             weak: false,
@@ -1265,9 +1317,24 @@ pub fn compile_project(
             opcode: u8,
             label: &'static str,
         ) {
-            buf.push(opcode);
-            jumps.push((buf.len(), label));
-            buf.push(0);
+            match opcode {
+                0xEB => {
+                    buf.push(0xE9);
+                }
+                0x74 => {
+                    buf.extend_from_slice(&[0x0F, 0x84]);
+                }
+                0x75 => {
+                    buf.extend_from_slice(&[0x0F, 0x85]);
+                }
+                0x7D => {
+                    buf.extend_from_slice(&[0x0F, 0x8D]);
+                }
+                _ => unreachable!("unsupported jump opcode: {opcode:#x}"),
+            }
+            let rel_pos = buf.len();
+            buf.extend_from_slice(&[0, 0, 0, 0]);
+            jumps.push((rel_pos, label));
         }
 
         let mut labels: std::collections::HashMap<&'static str, usize> =
@@ -1289,6 +1356,11 @@ pub fn compile_project(
         text.extend_from_slice(&[0x49, 0xB8]);
         let argv_store_off = text.len();
         text.write_u64::<LittleEndian>(0).unwrap();
+
+        text.extend_from_slice(&[0x4D, 0x89, 0xC3]);
+        text.extend_from_slice(&[0x49, 0x81, 0xC3]);
+        text.write_u32::<LittleEndian>(WINDOWS_ARGV_POINTER_BYTES as u32)
+            .unwrap();
 
         mark_label(&mut labels, "skip_space", &text);
         text.extend_from_slice(&[0x41, 0x8A, 0x02]);
@@ -1338,7 +1410,9 @@ pub fn compile_project(
         emit_jump(&mut text, &mut jumps, 0xEB, "skip_spaces_args");
 
         mark_label(&mut labels, "token_start", &text);
-        text.extend_from_slice(&[0x4D, 0x89, 0xD3]);
+        text.extend_from_slice(&[0x49, 0x83, 0xF9, WINDOWS_ARGV_POINTER_SLOTS as u8]);
+        emit_jump(&mut text, &mut jumps, 0x7D, "done");
+        text.extend_from_slice(&[0x4F, 0x89, 0x1C, 0xC8]);
 
         mark_label(&mut labels, "token_advance", &text);
         text.extend_from_slice(&[0x41, 0x8A, 0x02]);
@@ -1346,17 +1420,23 @@ pub fn compile_project(
         emit_jump(&mut text, &mut jumps, 0x74, "token_end");
         text.extend_from_slice(&[0x3C, 0x20]);
         emit_jump(&mut text, &mut jumps, 0x74, "token_end_space");
+        text.extend_from_slice(&[0x41, 0x88, 0x03]);
+        text.extend_from_slice(&[0x49, 0xFF, 0xC3]);
         text.extend_from_slice(&[0x49, 0xFF, 0xC2]);
         emit_jump(&mut text, &mut jumps, 0xEB, "token_advance");
 
         mark_label(&mut labels, "token_end_space", &text);
-        text.extend_from_slice(&[0x41, 0xC6, 0x02, 0x00]);
+        text.extend_from_slice(&[0x41, 0xC6, 0x03, 0x00]);
+        text.extend_from_slice(&[0x49, 0xFF, 0xC3]);
         text.extend_from_slice(&[0x49, 0xFF, 0xC2]);
-
-        mark_label(&mut labels, "token_end", &text);
-        text.extend_from_slice(&[0x4F, 0x89, 0x1C, 0xC8]);
         text.extend_from_slice(&[0x49, 0xFF, 0xC1]);
         emit_jump(&mut text, &mut jumps, 0xEB, "parse_loop");
+
+        mark_label(&mut labels, "token_end", &text);
+        text.extend_from_slice(&[0x41, 0xC6, 0x03, 0x00]);
+        text.extend_from_slice(&[0x49, 0xFF, 0xC3]);
+        text.extend_from_slice(&[0x49, 0xFF, 0xC1]);
+        emit_jump(&mut text, &mut jumps, 0xEB, "done");
 
         mark_label(&mut labels, "done_no_args", &text);
         mark_label(&mut labels, "done", &text);
@@ -1374,11 +1454,12 @@ pub fn compile_project(
             let target = *labels
                 .get(label)
                 .ok_or_else(|| format!("missing label {} in windows arg prologue", label))?;
-            let rel = (target as i64) - ((pos as i64) + 1);
-            if !(-128..=127).contains(&rel) {
+            let rel = (target as i64) - ((pos as i64) + 4);
+            if rel < (i32::MIN as i64) || rel > (i32::MAX as i64) {
                 return Err(format!("jump out of range for {}: {}", label, rel));
             }
-            text[pos] = (rel as i8) as u8;
+            let rel_bytes = (rel as i32).to_le_bytes();
+            text[pos..pos + 4].copy_from_slice(&rel_bytes);
         }
 
         gcl_reloc_offset = Some(gcl_off);
