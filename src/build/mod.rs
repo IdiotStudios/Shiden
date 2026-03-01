@@ -1345,61 +1345,105 @@ pub fn compile_project(
     let mut gcl_reloc_offset: Option<usize> = None;
 
     if target.contains("windows") {
-        fn mark_label(
-            labels: &mut std::collections::HashMap<&'static str, usize>,
-            name: &'static str,
-            buf: &[u8],
-        ) {
-            labels.insert(name, buf.len());
-        }
-
-        fn emit_jump(
-            buf: &mut Vec<u8>,
-            jumps: &mut Vec<(usize, &'static str)>,
-            opcode: u8,
-            label: &'static str,
-        ) {
-            match opcode {
-                0xEB => {
-                    buf.push(0xE9);
-                }
-                0x74 => {
-                    buf.extend_from_slice(&[0x0F, 0x84]);
-                }
-                0x75 => {
-                    buf.extend_from_slice(&[0x0F, 0x85]);
-                }
-                0x7D => {
-                    buf.extend_from_slice(&[0x0F, 0x8D]);
-                }
-                _ => unreachable!("unsupported jump opcode: {opcode:#x}"),
-            }
-            let rel_pos = buf.len();
-            buf.extend_from_slice(&[0, 0, 0, 0]);
-            jumps.push((rel_pos, label));
-        }
-
-        let mut labels: std::collections::HashMap<&'static str, usize> =
-            std::collections::HashMap::new();
-        let mut jumps: Vec<(usize, &'static str)> = Vec::new();
-
-        
         text.extend_from_slice(&[0x48, 0x83, 0xEC, 0x28]);
+
         text.extend_from_slice(&[0x48, 0xB8]);
         let gcl_off = text.len();
         text.write_u64::<LittleEndian>(0).unwrap();
-        text.extend_from_slice(&[0xFF, 0xD0]);  
+        text.extend_from_slice(&[0xFF, 0xD0]);
         text.extend_from_slice(&[0x48, 0x83, 0xC4, 0x28]);
-        
 
-        for (_pos, _label) in jumps {
-            
-        }
+        text.extend_from_slice(&[0x49, 0x89, 0xC0]);
+
+        text.extend_from_slice(&[0x49, 0xB9]);
+        let argv_store_off = text.len();
+        text.write_u64::<LittleEndian>(0).unwrap();
+
+        text.extend_from_slice(&[0x4D, 0x89, 0xCA]);
+
+        text.extend_from_slice(&[0x4D, 0x89, 0xCB]);
+        text.extend_from_slice(&[0x49, 0x81, 0xC3]);
+        text.write_u32::<LittleEndian>((WINDOWS_ARGV_POINTER_SLOTS * 8) as u32)
+            .unwrap();
+
+        text.extend_from_slice(&[0x45, 0x31, 0xE4]);
+
+        let skip_to_args_start = text.len();
+        text.extend_from_slice(&[0x41, 0x8A, 0x00]);
+        text.extend_from_slice(&[0x3C, 0x00]);
+        text.extend_from_slice(&[0x74, 0x30]);
+        let done_offset_1 = text.len() - 1;
+        text.extend_from_slice(&[0x3C, 0x20]);
+        text.extend_from_slice(&[0x75, 0x06]);
+        text.extend_from_slice(&[0x49, 0xFF, 0xC0]);
+        text.extend_from_slice(&[0xEB, 0xF0]);
+        let back_to_skip = text.len() - 1;
+
+        text.extend_from_slice(&[0x49, 0xFF, 0xC0]);
+        text.extend_from_slice(&[0x41, 0x8A, 0x00]);
+        text.extend_from_slice(&[0x3C, 0x20]);
+        text.extend_from_slice(&[0x75, 0xF7]);
+
+        let skip_spaces_start = text.len();
+        text.extend_from_slice(&[0x41, 0x8A, 0x00]);
+        text.extend_from_slice(&[0x3C, 0x00]);
+        text.extend_from_slice(&[0x74, 0x1E]);
+        let done_offset_2 = text.len() - 1;
+        text.extend_from_slice(&[0x3C, 0x20]);
+        text.extend_from_slice(&[0x75, 0x06]);
+        text.extend_from_slice(&[0x49, 0xFF, 0xC0]);
+        text.extend_from_slice(&[0xEB, 0xF0]);
+        let back_to_skip_spaces = text.len() - 1;
+
+        text.extend_from_slice(&[0x4D, 0x89, 0x1A]);
+        text.extend_from_slice(&[0x49, 0x83, 0xC2, 0x08]);
+        text.extend_from_slice(&[0x49, 0xFF, 0xC4]);
+
+        let copy_arg_start = text.len();
+        text.extend_from_slice(&[0x41, 0x8A, 0x00]);
+        text.extend_from_slice(&[0x3C, 0x00]);
+        text.extend_from_slice(&[0x74, 0x0C]);
+        text.extend_from_slice(&[0x3C, 0x20]);
+        text.extend_from_slice(&[0x74, 0x08]);
+        text.extend_from_slice(&[0x41, 0x88, 0x03]);
+        text.extend_from_slice(&[0x49, 0xFF, 0xC3]);
+        text.extend_from_slice(&[0x49, 0xFF, 0xC0]);
+        text.extend_from_slice(&[0xEB, 0xED]);
+        let back_to_copy = text.len() - 1;
+
+        text.extend_from_slice(&[0x41, 0xC6, 0x03, 0x00]);
+        text.extend_from_slice(&[0x49, 0xFF, 0xC3]);
+        text.extend_from_slice(&[0x49, 0xFF, 0xC0]);
+        text.extend_from_slice(&[0xEB]);
+        let _skip_spaces_jump = text.len();
+        text.push(((skip_spaces_start as i8).wrapping_sub(text.len() as i8)).wrapping_sub(1) as u8);
+
+        let done_label = text.len();
+        text.extend_from_slice(&[0x48, 0xB8]);
+        let argc_addr_off = text.len();
+        text.write_u64::<LittleEndian>(0).unwrap();
+        text.extend_from_slice(&[0x4C, 0x89, 0x20]);
+
+        text.extend_from_slice(&[0x48, 0xB8]);
+        let argv_addr_off = text.len();
+        text.write_u64::<LittleEndian>(0).unwrap();
+        text.extend_from_slice(&[0x4C, 0x89, 0x08]);
+
+        let offset = (done_label as i8).wrapping_sub((done_offset_1 + 1) as i8);
+        text[done_offset_1] = offset as u8;
+        let offset = (done_label as i8).wrapping_sub((done_offset_2 + 1) as i8);
+        text[done_offset_2] = offset as u8;
+        let offset = (skip_to_args_start as i8).wrapping_sub((back_to_skip + 1) as i8);
+        text[back_to_skip] = offset as u8;
+        let offset = (skip_spaces_start as i8).wrapping_sub((back_to_skip_spaces + 1) as i8);
+        text[back_to_skip_spaces] = offset as u8;
+        let offset = (copy_arg_start as i8).wrapping_sub((back_to_copy + 1) as i8);
+        text[back_to_copy] = offset as u8;
 
         gcl_reloc_offset = Some(gcl_off);
-        argv_store_reloc_offset = None;  
-        argc_reloc_offset = None;  
-        argv_reloc_offset = None;  
+        argv_store_reloc_offset = Some(argv_store_off);
+        argc_reloc_offset = Some(argc_addr_off);
+        argv_reloc_offset = Some(argv_addr_off);
     } else {
         text.extend_from_slice(&[0x48, 0x8B, 0x04, 0x24]);
 
