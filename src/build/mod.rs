@@ -1402,15 +1402,20 @@ pub fn compile_project(
         let copy_arg_start = text.len();
         text.extend_from_slice(&[0x41, 0x8A, 0x00]);
         text.extend_from_slice(&[0x3C, 0x00]);
-        text.extend_from_slice(&[0x74, 0x0E]);
+        text.extend_from_slice(&[0x74]);
+        let je_null_offset = text.len();
+        text.push(0);
         text.extend_from_slice(&[0x3C, 0x20]);
-        text.extend_from_slice(&[0x74, 0x08]);
+        text.extend_from_slice(&[0x74]);
+        let je_space_offset = text.len();
+        text.push(0);
         text.extend_from_slice(&[0x41, 0x88, 0x03]);
         text.extend_from_slice(&[0x49, 0xFF, 0xC3]);
         text.extend_from_slice(&[0x49, 0xFF, 0xC0]);
         text.extend_from_slice(&[0xEB, 0xED]);
         let back_to_copy = text.len() - 1;
 
+        let arg_end_space_start = text.len();
         text.extend_from_slice(&[0x41, 0xC6, 0x03, 0x00]);
         text.extend_from_slice(&[0x49, 0xFF, 0xC3]);
         text.extend_from_slice(&[0x49, 0xFF, 0xC0]);
@@ -1418,10 +1423,16 @@ pub fn compile_project(
         let _skip_spaces_jump = text.len();
         text.push(((skip_spaces_start as i8).wrapping_sub(text.len() as i8)).wrapping_sub(1) as u8);
 
+        let arg_end_null_start = text.len();
         text.extend_from_slice(&[0x41, 0xC6, 0x03, 0x00]);
         text.extend_from_slice(&[0xEB]);
         let done_from_null_offset = text.len();
         text.push(0);
+
+        let offset = (arg_end_null_start as i8).wrapping_sub(je_null_offset as i8);
+        text[je_null_offset - 1] = offset as u8;
+        let offset = (arg_end_space_start as i8).wrapping_sub(je_space_offset as i8);
+        text[je_space_offset - 1] = offset as u8;
 
         let done_label = text.len();
         text.extend_from_slice(&[0x48, 0xB8]);
