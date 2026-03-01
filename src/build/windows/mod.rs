@@ -478,13 +478,21 @@ pub fn write_executable_from_sections(
         }
     }
 
-    let expected_size =
-        (size_of_headers as usize) + (text_raw_size as usize) + (rdata_raw_size as usize);
+    let expected_size = (size_of_headers as usize)
+        + (text_raw_size as usize)
+        + (rdata_raw_size as usize)
+        + (data_raw_size as usize);
     if file_bytes.len() < expected_size {
         file_bytes.resize(expected_size, 0);
     }
 
-    file_bytes.extend_from_slice(writable_data);
+    let data_offset = (size_of_headers as usize) + (text_raw_size as usize) + (rdata_raw_size as usize);
+    let data_end = data_offset + writable_data.len();
+    if data_end <= file_bytes.len() {
+        file_bytes[data_offset..data_end].copy_from_slice(writable_data);
+    } else {
+        return Err("not enough space for writable_data in file_bytes".to_string());
+    }
     let pad_data = (FILE_ALIGNMENT as usize) - (writable_data.len() % FILE_ALIGNMENT as usize);
     if pad_data != FILE_ALIGNMENT as usize {
         file_bytes.resize(file_bytes.len() + pad_data, 0);
