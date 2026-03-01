@@ -290,6 +290,11 @@ pub enum Commands {
     Compile {
         manifest: Option<String>,
     },
+
+    Update {
+        #[arg(long)]
+        check: bool,
+    },
 }
 
 fn read_source(path: &Option<String>) -> io::Result<String> {
@@ -304,6 +309,11 @@ fn read_source(path: &Option<String>) -> io::Result<String> {
 }
 
 pub fn run() {
+    let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+    rt.block_on(async_run());
+}
+
+async fn async_run() {
     let cli = Cli::parse();
     match &cli.command {
         Some(Commands::Parse { file }) => match read_source(file) {
@@ -595,6 +605,55 @@ pub fn run() {
                 Err(e) => {
                     eprintln!("{}", e);
                     std::process::exit(2);
+                }
+            }
+        }
+
+        Some(Commands::Update { check }) => {
+            if *check {
+                match crate::update::check_for_update().await {
+                    Ok(Some(version)) => {
+                        println!(
+                            "{} {} is available (you have {})",
+                            green("✓"),
+                            version,
+                            env!("CARGO_PKG_VERSION")
+                        );
+                        println!("Run '{}' to update", cyan("shiden update"));
+                    }
+                    Ok(None) => {
+                        println!(
+                            "{} You are running the latest version ({})",
+                            green("✓"),
+                            env!("CARGO_PKG_VERSION")
+                        );
+                    }
+                    Err(e) => {
+                        eprintln!("{}: {}", red("Failed to check for updates"), e);
+                        std::process::exit(1);
+                    }
+                }
+            } else {
+                match crate::update::perform_update().await {
+                    Ok(updated) => {
+                        if updated {
+                            println!("{} Successfully updated to the latest version", green("✓"));
+                            println!(
+                                "{}",
+                                cyan("Please restart shiden for the changes to take effect")
+                            );
+                        } else {
+                            println!(
+                                "{} You are running the latest version ({})",
+                                green("✓"),
+                                env!("CARGO_PKG_VERSION")
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("{}: {}", red("Update failed"), e);
+                        std::process::exit(1);
+                    }
                 }
             }
         }
