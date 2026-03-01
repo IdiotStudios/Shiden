@@ -1429,10 +1429,10 @@ pub fn compile_project(
         let done_from_null_offset = text.len();
         text.push(0);
 
-        let offset = (arg_end_null_start as i8).wrapping_sub(je_null_offset as i8);
-        text[je_null_offset - 1] = offset as u8;
-        let offset = (arg_end_space_start as i8).wrapping_sub(je_space_offset as i8);
-        text[je_space_offset - 1] = offset as u8;
+        let offset = (arg_end_null_start as i8).wrapping_sub((je_null_offset + 1) as i8);
+        text[je_null_offset] = offset as u8;
+        let offset = (arg_end_space_start as i8).wrapping_sub((je_space_offset + 1) as i8);
+        text[je_space_offset] = offset as u8;
 
         let done_label = text.len();
         text.extend_from_slice(&[0x48, 0xB8]);
@@ -1455,8 +1455,8 @@ pub fn compile_project(
         text[back_to_skip_spaces] = offset as u8;
         let offset = (copy_arg_start as i8).wrapping_sub((back_to_copy + 1) as i8);
         text[back_to_copy] = offset as u8;
-        let offset = (done_label as i8).wrapping_sub((done_from_null_offset) as i8);
-        text[done_from_null_offset - 1] = offset as u8;
+        let offset = (done_label as i8).wrapping_sub((done_from_null_offset + 1) as i8);
+        text[done_from_null_offset] = offset as u8;
 
         gcl_reloc_offset = Some(gcl_off);
         argv_store_reloc_offset = Some(argv_store_off);
