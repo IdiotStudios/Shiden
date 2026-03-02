@@ -64,7 +64,7 @@ try {
         $ChecksumResponse.Content | Out-File -Path $ChecksumFile -Encoding ASCII
         
         $DownloadedHash = (Get-FileHash -Path $TmpFile -Algorithm SHA256).Hash
-        $ExpectedHash = ($ChecksumFile | Get-Content).Split()[0]
+        $ExpectedHash = (Get-Content $ChecksumFile).Trim().Split(" ")[0]
         
         if ($DownloadedHash -ne $ExpectedHash) {
             Write-Host "Checksum verification failed!" -ForegroundColor Red
@@ -89,7 +89,8 @@ Write-Host "Binary installed to: $TargetPath" -ForegroundColor Cyan
 
 # Check if install directory is in PATH
 $PathEnv = [Environment]::GetEnvironmentVariable("Path", "User")
-if ($PathEnv -like "*$InstallDir*") {
+$Paths = $PathEnv -split ";"
+if ($Paths -contains $InstallDir) {
     Write-Host "$InstallDir is in your PATH" -ForegroundColor Green
 } else {
     Write-Host "Adding $InstallDir to PATH..." -ForegroundColor Cyan
