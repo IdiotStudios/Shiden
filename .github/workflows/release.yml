@@ -1,6 +1,11 @@
 name: Release Binaries
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Cargo.toml'
   workflow_dispatch:
 
 environment:
@@ -10,8 +15,29 @@ permissions:
   contents: write
 
 jobs:
+  prepare-release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(grep '^version =' Cargo.toml | head -n1 | sed 's/version = "\(.*\)"/\1/')
+          echo "version=v$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Create tag if missing
+        run: |
+          git fetch --tags
+          if ! git rev-parse "${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            git tag ${{ steps.version.outputs.version }}
+            git push origin ${{ steps.version.outputs.version }}
+          fi
   build-release:
     name: Build Release (${{ matrix.target }})
+    needs: prepare-release
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -42,7 +68,6 @@ jobs:
             target: aarch64-apple-darwin
             artifact_name: shiden
             asset_name: shiden-macos-aarch64
-
     steps:
       - uses: actions/checkout@v4
 
@@ -61,12 +86,8 @@ jobs:
       - name: Prepare artifact
         shell: bash
         run: |
-          if [[ "${{ matrix.target }}" == *"windows"* ]]; then
-            cp target/${{ matrix.target }}/release/${{ matrix.artifact_name }} ${{ matrix.asset_name }}
-          else
-            cp target/${{ matrix.target }}/release/${{ matrix.artifact_name }} ${{ matrix.asset_name }}
-            chmod +x ${{ matrix.asset_name }}
-          fi
+          cp target/${{ matrix.target }}/release/${{ matrix.artifact_name }} ${{ matrix.asset_name }}
+          chmod +x ${{ matrix.asset_name }} || true
 
       - name: Create checksum
         shell: bash
@@ -79,13 +100,26 @@ jobs:
             shasum -a 256 ${{ matrix.asset_name }} > ${{ matrix.asset_name }}.sha256
           fi
 
-      - name: Upload to release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
         with:
-          files: |
+          name: ${{ matrix.asset_name }}
+          path: |
             ${{ matrix.asset_name }}
             ${{ matrix.asset_name }}.sha256
+  publish-release:
+    needs: [prepare-release, build-release]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.prepare-release.outputs.version }}
+          files: artifacts/**/*
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
