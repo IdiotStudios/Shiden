@@ -1,7 +1,6 @@
 # Installing Shiden
 
-Shiden can be installed via Cargo (from source) or using pre-built binaries with automatic updates.  
-Planning to upload to Crates soon, but for now you can install from GitHub releases.
+Shiden can be installed via Crates or using pre-built binaries with automatic updates.  
 
 ## Option 1: From Cargo
 
@@ -10,7 +9,7 @@ If you have Rust installed, you can install Shiden directly from crates.io:
 ```bash
 cargo install shiden
 ```
-
+  
 To update, just run the same command again.
 
 ## Option 2: Pre-built Binaries
@@ -94,7 +93,7 @@ And optionally remove the install directory:
 
 ```bash
 # Linux/macOS
-rm -rf ~/.local/bin
+rm -rf ~/.local/bin/shiden
 
 # Windows  
 rmdir %USERPROFILE%\.shiden
