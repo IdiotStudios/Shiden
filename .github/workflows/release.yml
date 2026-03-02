@@ -3,6 +3,9 @@ name: Release Binaries
 on:
   workflow_dispatch:
 
+environment:
+  name: release
+
 permissions:
   contents: write
 
