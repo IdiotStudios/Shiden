@@ -19,7 +19,8 @@ jobs:
         with:
           script: |
             const workflows = new Set([
-              "check.yml",
+              "check-rust.yml",
+              "check-shiden.yml",
               "pages.yml",
             ]);
             const ref = (context.ref || "").replace("refs/heads/", "") || "main";

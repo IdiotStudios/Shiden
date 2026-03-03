@@ -1,4 +1,4 @@
-name: Checks
+name: Checks - Shiden
 
 on:
   push:
@@ -16,45 +16,8 @@ permissions:
   pages: write
 
 jobs:
-  rust:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    environment:
-      name: checks
-    permissions:
-      pages: write
-      id-token: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          components: clippy, rustfmt
-
-      - name: Run cargo check
-        run: cargo check --verbose
-
-      - name: Run cargo test
-        run: cargo test --verbose
-
-      - name: Cache Cargo directories
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
   shiden:
     runs-on: ${{ matrix.os }}
-    needs: rust
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
