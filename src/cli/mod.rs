@@ -267,30 +267,36 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
+    #[command(about = "Parse and analyze a Shiden source file")]
     Parse {
         file: Option<String>,
     },
 
+    #[command(about = "Execute Shiden source code")]
     Run {
         file: Option<String>,
         #[arg(long)]
         out: Option<String>,
     },
 
+    #[command(about = "Validate syntax and check for compilation errors")]
     Check {
         file: Option<String>,
         #[arg(long)]
         format: Option<String>,
     },
 
+    #[command(about = "Create a new Shiden project")]
     New {
         name: String,
     },
 
+    #[command(about = "Compile a complete Shiden project")]
     Compile {
         manifest: Option<String>,
     },
 
+    #[command(about = "Check for and install updates")]
     Update {
         #[arg(long)]
         check: bool,
