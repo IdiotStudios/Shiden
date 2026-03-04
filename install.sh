@@ -66,26 +66,43 @@ fi
 
 # Verify checksum if available
 CHECKSUM_URL="https://github.com/$GITHUB_OWNER/$GITHUB_REPO/releases/download/$TAG/$ASSET_NAME.sha256"
-if curl -s -f -o /dev/null "$CHECKSUM_URL"; then
+CHECKSUM_FILE="/tmp/$ASSET_NAME.sha256.$$.tmp"
+
+if curl -s -L -f -o "$CHECKSUM_FILE" "$CHECKSUM_URL"; then
     echo -e "${BLUE}Verifying checksum...${NC}"
-    CHECKSUM_FILE="/tmp/$ASSET_NAME.sha256.$$.tmp"
-    curl -s "$CHECKSUM_URL" -o "$CHECKSUM_FILE"
     
-    if command -v sha256sum &> /dev/null; then
-        if ! sha256sum -c "$CHECKSUM_FILE" 2>/dev/null | grep -q " $TMP_FILE"; then
-            echo -e "${RED}Checksum verification failed!${NC}"
-            rm -f "$TMP_FILE" "$CHECKSUM_FILE"
-            exit 1
-        fi
-    elif command -v shasum &> /dev/null; then
-        if ! shasum -a 256 -c "$CHECKSUM_FILE" 2>/dev/null | grep -q " $TMP_FILE"; then
-            echo -e "${RED}Checksum verification failed!${NC}"
-            rm -f "$TMP_FILE" "$CHECKSUM_FILE"
-            exit 1
-        fi
+    EXPECTED_HASH=$(head -1 "$CHECKSUM_FILE" | awk '{print $1}')
+    
+    if [ -z "$EXPECTED_HASH" ]; then
+        echo -e "${RED}Error: Could not read checksum from file${NC}"
+        rm -f "$TMP_FILE" "$CHECKSUM_FILE"
+        exit 1
     fi
+    
+    # Compute the actual hash
+    if command -v sha256sum &> /dev/null; then
+        ACTUAL_HASH=$(sha256sum "$TMP_FILE" | awk '{print $1}')
+    elif command -v shasum &> /dev/null; then
+        ACTUAL_HASH=$(shasum -a 256 "$TMP_FILE" | awk '{print $1}')
+    else
+        echo -e "${RED}No checksum command available (sha256sum or shasum)${NC}"
+        rm -f "$TMP_FILE" "$CHECKSUM_FILE"
+        exit 1
+    fi
+    
+    # Compare hashes
+    if [ "$EXPECTED_HASH" != "$ACTUAL_HASH" ]; then
+        echo -e "${RED}Checksum verification failed!${NC}"
+        echo -e "${RED}Expected: $EXPECTED_HASH${NC}"
+        echo -e "${RED}Got:      $ACTUAL_HASH${NC}"
+        rm -f "$TMP_FILE" "$CHECKSUM_FILE"
+        exit 1
+    fi
+    
     rm -f "$CHECKSUM_FILE"
     echo -e "${GREEN}Checksum verified${NC}"
+else
+    echo -e "${BLUE}No checksum file available, skipping verification${NC}"
 fi
 
 # Move binary to install directory
