@@ -48,6 +48,18 @@ See [INSTALL.md](https://shiden.arson.dev/docs/#installation) for detailed insta
 [Shiden-Package-Registry]() (hint...)  
 [Benchmarks]() (hmm very soon)  
 
+## Error Handling
+
+```bash
+┌─   main.sd:12:2   ─┐
+│ line goes here()   │
+│ ^^^^^^^^^^^^^^^^^  │
+│ invalid syntax     │
+│ Hint: "line" is not│
+│ a valid statement. │
+└────────────────────┘
+```
+
 ## Todo
 
 - Improved error messages with code snippets and suggestions
