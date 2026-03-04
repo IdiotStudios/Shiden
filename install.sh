@@ -10,7 +10,7 @@ NC='\033[0m'
 
 GITHUB_OWNER="IdiotStudios"
 GITHUB_REPO="Shiden"
-INSTALL_DIR="${INSTALL_DIR:-.local/bin}"
+INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 
 # Create install directory if it doesn't exist
 mkdir -p "$INSTALL_DIR"
@@ -118,7 +118,7 @@ if [[ ":$PATH:" == *":$INSTALL_DIR:"* ]]; then
 else
     echo -e "${BLUE}Note: Add $INSTALL_DIR to your PATH to use shiden from anywhere${NC}"
     echo -e "${BLUE}Add this line to your shell profile (~/.bashrc, ~/.zshrc, etc):${NC}"
-    echo -e "${BLUE}export PATH=\"\$HOME/$INSTALL_DIR:\$PATH\"${NC}"
+    echo -e "${BLUE}export PATH=\"$INSTALL_DIR:\$PATH\"${NC}"
 fi
 
 echo -e ""
