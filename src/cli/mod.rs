@@ -315,6 +315,9 @@ pub fn run() {
 
 async fn async_run() {
     let cli = Cli::parse();
+
+    crate::update::check_for_updates_daily().await;
+
     match &cli.command {
         Some(Commands::Parse { file }) => match read_source(file) {
             Ok(src) => match crate::frontend::parse(&src) {
