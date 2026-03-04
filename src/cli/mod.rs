@@ -268,9 +268,7 @@ pub struct Cli {
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     #[command(about = "Parse and analyze a Shiden source file")]
-    Parse {
-        file: Option<String>,
-    },
+    Parse { file: Option<String> },
 
     #[command(about = "Execute Shiden source code")]
     Run {
@@ -287,19 +285,17 @@ pub enum Commands {
     },
 
     #[command(about = "Create a new Shiden project")]
-    New {
-        name: String,
-    },
+    New { name: String },
 
     #[command(about = "Compile a complete Shiden project")]
-    Compile {
-        manifest: Option<String>,
-    },
+    Compile { manifest: Option<String> },
 
     #[command(about = "Check for and install updates")]
     Update {
-        #[arg(long)]
+        #[arg(long, help = "Check for available updates without installing")]
         check: bool,
+        #[arg(long, help = "Compile and install from source")]
+        from_source: bool,
     },
 }
 
@@ -618,7 +614,7 @@ async fn async_run() {
             }
         }
 
-        Some(Commands::Update { check }) => {
+        Some(Commands::Update { check, from_source }) => {
             if *check {
                 match crate::update::check_for_update().await {
                     Ok(Some(version)) => {
@@ -639,6 +635,23 @@ async fn async_run() {
                     }
                     Err(e) => {
                         eprintln!("{}: {}", red("Failed to check for updates"), e);
+                        std::process::exit(1);
+                    }
+                }
+            } else if *from_source {
+                match crate::update::update_from_source().await {
+                    Ok(_) => {
+                        println!(
+                            "{} Successfully compiled and installed from source",
+                            green("✓")
+                        );
+                        println!(
+                            "{}",
+                            cyan("Please restart shiden for the changes to take effect")
+                        );
+                    }
+                    Err(e) => {
+                        eprintln!("{}: {}", red("Update from source failed"), e);
                         std::process::exit(1);
                     }
                 }

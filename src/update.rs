@@ -154,3 +154,132 @@ async fn fetch_latest_version() -> Result<Version, Box<dyn std::error::Error>> {
 struct GitHubRelease {
     tag_name: String,
 }
+
+pub async fn update_from_source() -> Result<(), Box<dyn std::error::Error>> {
+    use std::process::Command;
+
+    let temp_dir = std::env::temp_dir().join(format!("shiden-source-{}", std::process::id()));
+    fs::create_dir_all(&temp_dir)?;
+
+    let client = reqwest::Client::new();
+    let api_url = format!(
+        "https://api.github.com/repos/{}/{}/releases/latest",
+        GITHUB_OWNER, GITHUB_REPO
+    );
+    let response = client
+        .get(&api_url)
+        .header("User-Agent", "Shiden-CLI")
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        let _ = fs::remove_dir_all(&temp_dir);
+        return Err("Failed to fetch latest release info".into());
+    }
+
+    let release: GitHubRelease = response.json().await?;
+    let tag = release.tag_name;
+
+    eprintln!("Downloading {} source...", tag);
+    let download_url = format!(
+        "https://github.com/{}/{}/archive/refs/tags/{}.tar.gz",
+        GITHUB_OWNER, GITHUB_REPO, tag
+    );
+
+    let response = client.get(&download_url).send().await?;
+    if !response.status().is_success() {
+        let _ = fs::remove_dir_all(&temp_dir);
+        return Err("Failed to download source archive".into());
+    }
+
+    let bytes = response.bytes().await?;
+    let tar_path = temp_dir.join("source.tar.gz");
+    fs::write(&tar_path, &bytes)?;
+
+    eprintln!("Extracting source...");
+    extract_tar_gz(&tar_path, &temp_dir)?;
+
+    let extracted_dir = temp_dir.join(format!("{}-{}", GITHUB_REPO, tag.trim_start_matches('v')));
+    if !extracted_dir.exists() {
+        let _ = fs::remove_dir_all(&temp_dir);
+        return Err("Failed to find extracted source directory".into());
+    }
+
+    eprintln!("Compiling Shiden from source...");
+    let output = Command::new("cargo")
+        .arg("build")
+        .arg("--release")
+        .current_dir(&extracted_dir)
+        .output()?;
+
+    if !output.status.success() {
+        eprintln!("{}", String::from_utf8_lossy(&output.stderr));
+        let _ = fs::remove_dir_all(&temp_dir);
+        return Err("Failed to compile Shiden".into());
+    }
+
+    #[cfg(target_os = "windows")]
+    let binary_name = "shiden.exe";
+    #[cfg(not(target_os = "windows"))]
+    let binary_name = "shiden";
+
+    let binary_path = extracted_dir
+        .join("target")
+        .join("release")
+        .join(binary_name);
+
+    if !binary_path.exists() {
+        let _ = fs::remove_dir_all(&temp_dir);
+        return Err("Compiled binary not found".into());
+    }
+
+    let install_dir = if let Ok(install_dir) = std::env::var("INSTALL_DIR") {
+        PathBuf::from(install_dir)
+    } else {
+        #[cfg(target_os = "windows")]
+        let install_dir = {
+            if let Ok(userprofile) = std::env::var("USERPROFILE") {
+                PathBuf::from(userprofile).join(".shiden").join("bin")
+            } else {
+                PathBuf::from(".shiden").join("bin")
+            }
+        };
+        #[cfg(not(target_os = "windows"))]
+        let install_dir = {
+            if let Ok(home) = std::env::var("HOME") {
+                PathBuf::from(home).join(".local").join("bin")
+            } else {
+                PathBuf::from(".local").join("bin")
+            }
+        };
+        install_dir
+    };
+
+    fs::create_dir_all(&install_dir)?;
+
+    let target_path = install_dir.join(binary_name);
+    fs::copy(&binary_path, &target_path)?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let perms = fs::Permissions::from_mode(0o755);
+        fs::set_permissions(&target_path, perms)?;
+    }
+
+    let _ = fs::remove_dir_all(&temp_dir);
+
+    Ok(())
+}
+
+fn extract_tar_gz(
+    tar_path: &PathBuf,
+    dest_dir: &PathBuf,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let tar_file = fs::File::open(tar_path)?;
+    let decoder = flate2::read::GzDecoder::new(tar_file);
+    let mut archive = tar::Archive::new(decoder);
+    archive.unpack(dest_dir)?;
+
+    Ok(())
+}
