@@ -1,18 +1,90 @@
 # Shiden
 
-Shiden is a high-performance, ahead-of-time compiled programming language built for speed, predictability, and low-level control while retaining a familiar, Rust and JavaScript like syntax. (❤️ [Rust](https://github.com/rust-lang/rust))
+![License](https://img.shields.io/github/license/IdiotStudios/Shiden)
+![Stars](https://img.shields.io/github/stars/IdiotStudios/Shiden)
+![Issues](https://img.shields.io/github/issues/IdiotStudios/Shiden)
 
+Shiden is a high-performance ahead-of-time compiled language focused on speed, predictability, and low-level control, with a syntax familiar to Rust and JavaScript.
 
-| Plaform | Support | Phase |
-| :--- | :---: | ---: |
-| `linux` | Yes | Stable |
-| `windows` | Yes | Beta |
-| `macos` | No | Planned |
-| `arm` | No | Planned |
+Fast • Predictable • Minimal
 
-### Side Note:
-They should add like polls to gh repos. Would be Peak
+#### Hello World — Example
+(em-dashes ❤️)
 
+```shiden
+fn new main/
+    println("Hello, world!")/
+fn/
+```
+
+Run it with:
+```bash
+shiden run src/main.sd
+```
+
+#### Quick Example
+```shiden
+fn new main/
+
+    let nums = [1,2,3,4]/
+
+    for n in nums/
+        println(n)/
+    fn/
+
+fn/
+```
+
+## Features
+
+- Ahead-of-time compilation
+- Familiar Rust/JavaScript-like syntax
+- Built-in low-level system primitives
+- Built-in libraries implemented as optimized x86-64 machine code
+- Fast startup and predictable performance
+
+## Benchmarks
+
+All benchmarks are run on GitHub Actions and my local machine.  
+My machine uses an Intel i7-4770K CPU with 16GB of RAM.  
+Benchmarks are averages based off scripts in the `benchmarks/` directory.  
+All Benchmarks are avearge of 1000 runs.
+
+### **THIS IS A WORK IN PROGRESS!**
+
+### Hello World
+
+| Environment | Shiden | Rust | Node.js | Python | Assembly |
+|-------------|------:|-----:|--------:|-------:|---------:|
+| Local | ns | ns | ms | ms | ns |
+| GitHub | ns | ns | ms | ms | ns |
+
+## Why Shiden?
+
+Shiden is designed for developers who want the performance of systems languages without the complexity that often comes with them.
+
+It focuses on:
+
+- predictable performance
+- simple syntax
+- direct access to system primitives
+- minimal runtime overhead
+
+### Goal
+Shiden aims to combine the performance and control of Rust with the simplicity of scripting languages while exposing low-level system primitives directly.
+
+### Platforms
+
+| Platform | Arch | Support | Phase |
+| :--- | :---: | :---: | ---: |
+| `linux` | x86_64 | Yes | Stable |
+| `linux` | arm | No | Planned |
+| `windows` | x86_64 | Yes | Beta |
+| `macos` | N/A | No | Planned |
+More architectures and platforms are planned.
+
+### Random Thought
+GitHub should add polls to repos. That would be peak.
 
 ## Installation
 
@@ -47,13 +119,14 @@ shiden update
 
 See [INSTALL.md](https://shiden.arson.dev/docs/#installation) for detailed installation instructions and troubleshooting.
 
-## Some things we have
+## Ecosystem
 
-[VSCode-Extension](https://marketplace.visualstudio.com/items?itemName=IdiotStudios.shiden)  
-[Flavortown-Project](https://flavortown.hackclub.com/projects/10866)  
-[Shiden-Docs](https://shiden.arson.dev/docs)  
-[Shiden-Package-Registry]() (hint...)  
-[Benchmarks]() (hmm very soon)  
+- 🧠 **[VSCode-Extension](https://marketplace.visualstudio.com/items?itemName=IdiotStudios.shiden)**  
+- 🍽️ **[Flavortown-Project](https://flavortown.hackclub.com/projects/10866)**  
+- 📚 **[Shiden-Docs](https://shiden.arson.dev/docs)**  
+- 📦 **[Shiden-Package-Registry]()** (hint...)  
+- 🧪 **[Benchmarks]()** (hmm very soon)  
+(thanks kde emoji picker)
 
 ## Todo
 
@@ -65,8 +138,8 @@ See [INSTALL.md](https://shiden.arson.dev/docs/#installation) for detailed insta
 
 ## Libraries
 
-Shiden has built in [libraries](src/libraries).  
-Best ones are:
+Shiden includes built-in libraries.
+Some of the most useful include:
 
 * [Filesystem](src/libraries/filesystem)
 * [Networking](src/libraries/networking)
@@ -87,7 +160,7 @@ To add a library function:
 **Example:**
 ```rust
 // Simple add function in x86-64 bytecode
-// FYI I would not trust my bytecode so use this as an example
+// Example bytecode for demonstration purposes only (not actual code)
 pub const add: &[u8] = &[
     0x55,                   // push rbp
     0x48, 0x89, 0xe5,       // mov rbp, rsp
@@ -99,13 +172,14 @@ pub const add: &[u8] = &[
 ```
 
 ## CLI
-
-* Shiden parse (parses shiden stuff) - deprecating
-* Shiden run (release mode by default, add --debug for debug mode)
-* Shiden check (runs checks)
-* Shiden new {name} (makes an new project)
-* Shiden compile (Compiles Shiden (Shiden run does the same anyway))
-* Shiden help (shows a help command)
+| Command | Description | Status |
+| :--- | :--- | :---: |
+| `shiden parse` | parses Shiden files | deprecating |
+| `shiden run` | release mode by default, add `--debug` for debug mode | ✅ |
+| `shiden check` | runs checks | ✅ |
+| `shiden new {name}` | creates a new project | ✅ |
+| `shiden compile` | compiles Shiden (run does the same anyway) | ✅ |
+| `shiden help` | shows help | ✅ |
 
 ### Shiden init/new folder formats
 
@@ -115,7 +189,7 @@ my_project/
 ├── src/  
 │   └── main.sd         // Executable entry  
 ├── tests/  
-│   └── example.sd  // doesent work yet  
+│   └── example.sd  // doesn't work yet  
 ├── build/              // Compiled binaries  
 │   ├── cache/   // Build cache (none)  
 │   ├── linux/   // Linux target  
