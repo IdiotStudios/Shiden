@@ -46,7 +46,7 @@ fn/
 ## Benchmarks
 
 All benchmarks are run on GitHub Actions and my local machine.  
-My machine uses an Intel i7-4770K CPU with 16GB of RAM.  
+My machine uses an Intel i7-4770K CPU with 16GB of RAM on Arch Linux.  
 Benchmarks are averages based off scripts in the `benchmarks/` directory.  
 All Benchmarks are avearge of 1000 runs.
 
