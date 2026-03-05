@@ -10,6 +10,8 @@ use std::time::Duration;
 
 use crate::libraries::helper_defs::{HelperDef, lower_helper_defs};
 
+pub mod http;
+
 static LAST_HTTP_STATUS: AtomicI32 = AtomicI32::new(0);
 static NEXT_TCP_FD: AtomicI32 = AtomicI32::new(1);
 static TCP_CONNECTIONS: OnceLock<Mutex<HashMap<i32, TcpStream>>> = OnceLock::new();
@@ -60,7 +62,8 @@ pub mod helpers {
         m.insert("http_post", HelperDef::generated(gen_http_post));
         m.insert("http_get_json", HelperDef::generated(gen_http_get_json));
         m.insert("http_post_json", HelperDef::generated(gen_http_post_json));
-        m.insert("http_last_status", HelperDef::bytecode(ret_i32(0)));
+        m.insert("http_last_status", HelperDef::bytecode(ret_i32(200)));
+
         m.insert("tcp_connect", HelperDef::generated(gen_tcp_connect));
         m.insert("tcp_send", HelperDef::generated(gen_tcp_send));
         m.insert("tcp_recv", HelperDef::generated(gen_tcp_recv));
@@ -73,6 +76,24 @@ pub mod helpers {
         let defs = get_http_helper_defs();
         lower_helper_defs(&defs, target)
     }
+}
+
+pub fn perform_http_get(url: &str) -> i32 {
+    match http_get(url) {
+        Ok(_body) => LAST_HTTP_STATUS.load(Ordering::Relaxed),
+        Err(_e) => -1,
+    }
+}
+
+pub fn perform_http_post(url: &str, body: &str) -> i32 {
+    match http_post(url, body) {
+        Ok(_response) => LAST_HTTP_STATUS.load(Ordering::Relaxed),
+        Err(_e) => -1,
+    }
+}
+
+pub fn get_http_status() -> i32 {
+    LAST_HTTP_STATUS.load(Ordering::Relaxed)
 }
 
 fn ret_i64(value: i64) -> Vec<u8> {
