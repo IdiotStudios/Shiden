@@ -54,10 +54,10 @@ All Benchmarks are avearge of 1000 runs.
 
 ### Hello World
 
-| Environment | Shiden | Rust | Node.js | Python | Assembly |
-|-------------|------:|-----:|--------:|-------:|---------:|
-| Local | ns | ns | ms | ms | ns |
-| GitHub | ns | ns | ms | ms | ns |
+| Environment | Shiden | Rust | Assembly | Node.js | Python |
+|-------------|-----:|-----:|-----:|-----:|-----:|
+| Local | ns | ns | ns | ms | ms |
+| GitHub | ns | ns | ns | ms | ms |
 
 ## Why Shiden?
 
