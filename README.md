@@ -1,8 +1,15 @@
 # Shiden
 
-Shiden is a high-performance, ahead-of-time compiled programming language built for speed, predictability, and low-level control while retaining a familiar, Rust like syntax. (❤️ [Rust](https://github.com/rust-lang/rust))
+Shiden is a high-performance, ahead-of-time compiled programming language built for speed, predictability, and low-level control while retaining a familiar, Rust and JavaScript like syntax. (❤️ [Rust](https://github.com/rust-lang/rust))
 
-Shiden has a .sd file format
+
+| Plaform | Support | Phase |
+| :--- | :---: | ---: |
+| `linux` | Yes | Stable |
+| `windows` | Yes | Beta |
+| `macos` | No | Planned |
+| `arm` | No | Planned |
+
 
 ## Installation
 
@@ -18,8 +25,7 @@ curl -fsSL https://raw.githubusercontent.com/IdiotStudios/Shiden/main/install.sh
 powershell -ExecutionPolicy Bypass -File (iwr https://raw.githubusercontent.com/IdiotStudios/Shiden/main/install.ps1 -UseBasicParsing).Content
 ```
 
-### From Source (Cargo)
-
+**Crates.io:** (Will work in next release ~1-2d)
 ```bash
 cargo install shiden
 ```
@@ -43,43 +49,24 @@ See [INSTALL.md](https://shiden.arson.dev/docs/#installation) for detailed insta
 [VSCode-Extension](https://marketplace.visualstudio.com/items?itemName=IdiotStudios.shiden)  
 [Flavortown-Project](https://flavortown.hackclub.com/projects/10866)  
 [Shiden-Docs](https://shiden.arson.dev/docs)  
-[Shiden-Hosting]() (hint...)  
-[Shiden-Playground]() (hint...)  
 [Shiden-Package-Registry]() (hint...)  
 [Benchmarks]() (hmm very soon)  
 
-## Error Handling
-
-```bash
-┌─   main.sd:12:2   ─┐
-│ line goes here()   │
-│ ^^^^^^^^^^^^^^^^^  │
-│ invalid syntax     │
-│ Hint: "line" is not│
-│ a valid statement. │
-└────────────────────┘
-```
-
 ## Todo
 
-- Improved error messages with code snippets and suggestions
-- Built-in libraries for common tasks (networking, filesystem, etc.)
-- Better Documentation and more examples
-- Unsafe code blocks for low-level operations
-- Better testing framework and support for unit/integration tests (future plan)
-- IDE integration and language server support (future plan)
-- Performance optimizations and benchmarking tools (future plan)
-- Support for more data types and features (enums, traits, async/await, etc.) (future plan)
+1. Improved error messages with code snippets and suggestions
+2. Unsafe code blocks for low-level operations
+3. Better testing framework and support for unit/integration tests
+4. Performance optimizations and benchmarking tools
+5. Support for more data types and features (enums, traits, async/await, etc.)
 
 ## Libraries
 
 Shiden has built in [libraries](src/libraries).  
-Which are:
+Best ones are:
 
 * [Filesystem](src/libraries/filesystem)
 * [Networking](src/libraries/networking)
-* [Rendering](src/libraries/rendering)
-* [Math](src/libraries/math)
 
 
 ### Library Architecture
@@ -97,6 +84,7 @@ To add a library function:
 **Example:**
 ```rust
 // Simple add function in x86-64 bytecode
+// FYI I would not trust my bytecode so use this as an example
 pub const add: &[u8] = &[
     0x55,                   // push rbp
     0x48, 0x89, 0xe5,       // mov rbp, rsp
@@ -107,41 +95,9 @@ pub const add: &[u8] = &[
 ];
 ```
 
-## Multi-Platform Compilation
-
-Shiden supports compiling for multiple platforms. The compiler automatically detects your current platform and builds for it, with the ability to cross-compile to other targets.
-
-### Supported Platforms
-
-* **Linux** (`linux`) - Implemented
-* **Windows** (`windows`) - Implemented (beta)
-* **macOS** (`macos`) - Planned
-
-### Soon to be Supported
-
-* **WebAssembly** (`wasm`) - compile for web browsers and wasm runtimes
-* **ARM** (`arm`) - compile for arm based systems
-* **32-bit x86** (`x86`) - will compile it for all platforms that support it if specified.
-* **RISC-V** (`riscv`) - compile for RISC-V architecture
-* **PowerPC** (`ppc`) - compile for ppc (xbox 360)
-* **Mobile (iOS/Android)** (`mobile`) - compile for mobile platforms
-* **Operating System** (`iso`) - compile a custom OS
-* **Embedded** (`embedded`) - compile for microcontrollers and embedded devices
-* **Drivers** (`drivers`) - compile kernel modules and device drivers
-
-### Configure Targets
-
-Specify your target platforms in `shiden.toml`:
-
-```toml
-[build]
-opt_level = 3
-targets = ["linux", "windows", "macos"]
-```
-
 ## CLI
 
-* Shiden parse (parses shiden stuff)
+* Shiden parse (parses shiden stuff) - deprecating
 * Shiden run (release mode by default, add --debug for debug mode)
 * Shiden check (runs checks)
 * Shiden new {name} (makes an new project)
@@ -167,7 +123,7 @@ my_project/
 
 ## Contributing
 
-If you do wanna contribute <3 then feel free to create issues or pull requests! I love the support.
+If you do wanna contribute then feel free to create issues or pull requests! Love the support.
 
 ## License
 
@@ -176,7 +132,3 @@ Licensed under the MIT License. See the `LICENSE` file for details.
 ## AI Notice
 
 Used AI for inline code completions and for documentation writing. Also for debugging.
-
-## Extra
-
-[code-typing](https://github.com/user-attachments/assets/f92badf9-a22e-46d5-b399-7c2127d3201a)
