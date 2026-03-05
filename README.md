@@ -10,6 +10,9 @@ Shiden is a high-performance, ahead-of-time compiled programming language built 
 | `macos` | No | Planned |
 | `arm` | No | Planned |
 
+### Side Note:
+They should add like polls to gh repos. Would be Peak
+
 
 ## Installation
 
