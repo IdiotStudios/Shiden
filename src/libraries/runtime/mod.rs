@@ -176,6 +176,10 @@ pub fn get_helpers(target: &str) -> BTreeMap<&'static str, Vec<u8>> {
             ],
         );
 
+        for (name, bytes) in crate::libraries::networking::helpers::get_http_helpers(target) {
+            m.insert(name, bytes);
+        }
+
         return m;
     }
 
@@ -401,6 +405,10 @@ pub fn get_helpers(target: &str) -> BTreeMap<&'static str, Vec<u8>> {
         "net_close",
         vec![0xB8, 0x03, 0x00, 0x00, 0x00, 0x0F, 0x05, 0xC3],
     );
+
+    for (name, bytes) in crate::libraries::networking::helpers::get_http_helpers(target) {
+        m.insert(name, bytes);
+    }
 
     m
 }

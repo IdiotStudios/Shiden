@@ -60,45 +60,42 @@ fn update_last_check_timestamp() {
     let _ = fs::write(&check_file, "");
 }
 
-pub async fn check_for_updates_daily() {
+pub fn check_for_updates_daily() {
     if !should_check_for_updates() {
         return;
     }
 
-    match tokio::time::timeout(std::time::Duration::from_secs(5), check_for_update()).await {
-        Ok(Ok(Some(new_version))) => {
-            let current_version = env!("CARGO_PKG_VERSION");
-            let yellow = "\x1b[33m";
-            let cyan = "\x1b[36m";
-            let reset = "\x1b[0m";
-            eprintln!();
-            eprintln!(
-                "{}╭─ Update available ─────────────────────╮{}",
-                yellow, reset
-            );
-            eprintln!(
-                "{}│{} Shiden {} → {} {}{}",
-                yellow, cyan, current_version, new_version, yellow, reset
-            );
-            eprintln!(
-                "{}│{} Run {} to install {}",
-                yellow, cyan, "shiden update", yellow
-            );
-            eprintln!(
-                "{}╰────────────────────────────────────────╯{}",
-                yellow, reset
-            );
-            eprintln!();
-        }
-        _ => {}
+    if let Ok(Some(new_version)) = check_for_update() {
+        let current_version = env!("CARGO_PKG_VERSION");
+        let yellow = "\x1b[33m";
+        let cyan = "\x1b[36m";
+        let reset = "\x1b[0m";
+        eprintln!();
+        eprintln!(
+            "{}╭─ Update available ─────────────────────╮{}",
+            yellow, reset
+        );
+        eprintln!(
+            "{}│{} Shiden {} → {} {}{}",
+            yellow, cyan, current_version, new_version, yellow, reset
+        );
+        eprintln!(
+            "{}│{} Run {} to install {}",
+            yellow, cyan, "shiden update", yellow
+        );
+        eprintln!(
+            "{}╰────────────────────────────────────────╯{}",
+            yellow, reset
+        );
+        eprintln!();
     }
 
     update_last_check_timestamp();
 }
 
-pub async fn check_for_update() -> Result<Option<String>, Box<dyn std::error::Error>> {
+pub fn check_for_update() -> Result<Option<String>, Box<dyn std::error::Error>> {
     let current_version = Version::parse(env!("CARGO_PKG_VERSION"))?;
-    let latest_version = fetch_latest_version().await?;
+    let latest_version = fetch_latest_version()?;
 
     if latest_version > current_version {
         Ok(Some(latest_version.to_string()))
@@ -107,9 +104,9 @@ pub async fn check_for_update() -> Result<Option<String>, Box<dyn std::error::Er
     }
 }
 
-pub async fn perform_update() -> Result<bool, Box<dyn std::error::Error>> {
+pub fn perform_update() -> Result<bool, Box<dyn std::error::Error>> {
     let current_version = Version::parse(env!("CARGO_PKG_VERSION"))?;
-    let latest_version = fetch_latest_version().await?;
+    let latest_version = fetch_latest_version()?;
 
     if latest_version <= current_version {
         return Ok(false);
@@ -128,24 +125,22 @@ pub async fn perform_update() -> Result<bool, Box<dyn std::error::Error>> {
     Ok(true)
 }
 
-async fn fetch_latest_version() -> Result<Version, Box<dyn std::error::Error>> {
-    let client = reqwest::Client::new();
+fn fetch_latest_version() -> Result<Version, Box<dyn std::error::Error>> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()?;
     let url = format!(
         "https://api.github.com/repos/{}/{}/releases/latest",
         GITHUB_OWNER, GITHUB_REPO
     );
 
-    let response = client
-        .get(&url)
-        .header("User-Agent", "Shiden-CLI")
-        .send()
-        .await?;
+    let response = client.get(&url).header("User-Agent", "Shiden-CLI").send()?;
 
     if !response.status().is_success() {
         return Err("Failed to fetch latest release info".into());
     }
 
-    let release: GitHubRelease = response.json().await?;
+    let release: GitHubRelease = response.json()?;
     let version_str = release.tag_name.trim_start_matches('v');
     Ok(Version::parse(version_str)?)
 }
@@ -155,13 +150,15 @@ struct GitHubRelease {
     tag_name: String,
 }
 
-pub async fn update_from_source() -> Result<(), Box<dyn std::error::Error>> {
+pub fn update_from_source() -> Result<(), Box<dyn std::error::Error>> {
     use std::process::Command;
 
     let temp_dir = std::env::temp_dir().join(format!("shiden-source-{}", std::process::id()));
     fs::create_dir_all(&temp_dir)?;
 
-    let client = reqwest::Client::new();
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()?;
     let api_url = format!(
         "https://api.github.com/repos/{}/{}/releases/latest",
         GITHUB_OWNER, GITHUB_REPO
@@ -169,15 +166,14 @@ pub async fn update_from_source() -> Result<(), Box<dyn std::error::Error>> {
     let response = client
         .get(&api_url)
         .header("User-Agent", "Shiden-CLI")
-        .send()
-        .await?;
+        .send()?;
 
     if !response.status().is_success() {
         let _ = fs::remove_dir_all(&temp_dir);
         return Err("Failed to fetch latest release info".into());
     }
 
-    let release: GitHubRelease = response.json().await?;
+    let release: GitHubRelease = response.json()?;
     let tag = release.tag_name;
 
     eprintln!("Downloading {} source...", tag);
@@ -186,13 +182,13 @@ pub async fn update_from_source() -> Result<(), Box<dyn std::error::Error>> {
         GITHUB_OWNER, GITHUB_REPO, tag
     );
 
-    let response = client.get(&download_url).send().await?;
+    let response = client.get(&download_url).send()?;
     if !response.status().is_success() {
         let _ = fs::remove_dir_all(&temp_dir);
         return Err("Failed to download source archive".into());
     }
 
-    let bytes = response.bytes().await?;
+    let bytes = response.bytes()?;
     let tar_path = temp_dir.join("source.tar.gz");
     fs::write(&tar_path, &bytes)?;
 

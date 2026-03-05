@@ -748,7 +748,7 @@ impl<'a> Parser<'a> {
                     return Ok(Expr::Identifier(name));
                 }
 
-                let known_libraries = ["math", "fs", "net"];
+                let known_libraries = ["math", "fs", "net", "ftpdb", "http"];
                 if known_libraries.contains(&name.as_str())
                     && let Token::Identifier(_) = &self.peek
                 {
@@ -1120,6 +1120,44 @@ mod tests {
                 "parse_function failed at cur {:?} peek {:?}: {}",
                 p.cur, p.peek, e
             ),
+        }
+    }
+
+    #[test]
+    fn parse_ftpdb_library_call_name_lowering() {
+        let src = "fn new main/\n    let x = ftpdb top this week()/i64\nfn/";
+        let res = parse(src).expect("parse failed");
+        match &res.items[0] {
+            Item::Function { body, .. } => match &body[0] {
+                Stmt::Let { value, .. } => match value {
+                    Expr::Call { name, args } => {
+                        assert_eq!(name, "ftpdb_top_this_week");
+                        assert!(args.is_empty());
+                    }
+                    other => panic!("expected call expr, got {:?}", other),
+                },
+                other => panic!("expected let stmt, got {:?}", other),
+            },
+            _ => panic!("expected function"),
+        }
+    }
+
+    #[test]
+    fn parse_http_library_call_name_lowering() {
+        let src = "fn new main/\n    let x = http get(\"https://example.com\")/i64\nfn/";
+        let res = parse(src).expect("parse failed");
+        match &res.items[0] {
+            Item::Function { body, .. } => match &body[0] {
+                Stmt::Let { value, .. } => match value {
+                    Expr::Call { name, args } => {
+                        assert_eq!(name, "http_get");
+                        assert_eq!(args.len(), 1);
+                    }
+                    other => panic!("expected call expr, got {:?}", other),
+                },
+                other => panic!("expected let stmt, got {:?}", other),
+            },
+            _ => panic!("expected function"),
         }
     }
 }

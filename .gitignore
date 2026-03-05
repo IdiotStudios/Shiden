@@ -3,3 +3,6 @@
 # Decided not to release it
 /slack-bot
 .vscode
+
+# Ignore futurelib
+/futurelib

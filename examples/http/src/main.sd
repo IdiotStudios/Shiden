@@ -1,0 +1,35 @@
+fn new main/
+    println("HTTP Networking Example")/
+    println("========================")/
+    println("")/
+
+    println("Example 1: HTTP GET Request")/
+    let response_ptr = http_get("http://example.com")/i64
+    println("Response pointer: {}", response_ptr)/
+
+    println("")/
+
+    println("Example 2: HTTP Last Status")/
+    let status = http_last_status()/i32
+    println("Last HTTP status code: {}", status)/
+
+    println("")/
+
+    println("Example 3: HTTP GET JSON")/
+    let json_ptr = http_get_json("http://api.example.com/data")/i64
+    println("JSON response pointer: {}", json_ptr)/
+
+    println("")/
+
+    println("Example 4: TCP Connect")/
+    let fd = tcp_connect("example.com", 80)/i64
+    println("Socket fd: {}", fd)/
+
+    println("")/
+    println("All examples completed!")/
+    println("")/
+    println("NOTE: HTTP functionality is implemented in Rust using std::net,")/
+    println("but bytecode bridge is not yet connected. Functions return 0/-1.")/
+    println("Real HTTP GET/POST works for http:// URLs (no HTTPS yet).")/
+    println("See src/libraries/networking/mod.rs for implementation.")/
+fn/

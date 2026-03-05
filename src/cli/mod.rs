@@ -137,8 +137,19 @@ mod hires_timer {
             unsafe {
                 clock_gettime(CLOCK_MONOTONIC_RAW, &mut ts);
             }
-            let nanos = (ts.tv_sec - self.start_sec) as u64 * 1_000_000_000
-                + (ts.tv_nsec - self.start_nsec) as u64;
+            let mut sec = ts.tv_sec - self.start_sec;
+            let mut nsec = ts.tv_nsec - self.start_nsec;
+            if nsec < 0 {
+                sec -= 1;
+                nsec += 1_000_000_000;
+            }
+            let nanos = if sec < 0 {
+                0
+            } else {
+                (sec as u64)
+                    .saturating_mul(1_000_000_000)
+                    .saturating_add(nsec as u64)
+            };
             let picos = 0u64;
             HighResDuration { nanos, picos }
         }
@@ -311,14 +322,9 @@ fn read_source(path: &Option<String>) -> io::Result<String> {
 }
 
 pub fn run() {
-    let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
-    rt.block_on(async_run());
-}
-
-async fn async_run() {
     let cli = Cli::parse();
 
-    crate::update::check_for_updates_daily().await;
+    crate::update::check_for_updates_daily();
 
     match &cli.command {
         Some(Commands::Parse { file }) => match read_source(file) {
@@ -616,7 +622,7 @@ async fn async_run() {
 
         Some(Commands::Update { check, from_source }) => {
             if *check {
-                match crate::update::check_for_update().await {
+                match crate::update::check_for_update() {
                     Ok(Some(version)) => {
                         println!(
                             "{} {} is available (you have {})",
@@ -639,7 +645,7 @@ async fn async_run() {
                     }
                 }
             } else if *from_source {
-                match crate::update::update_from_source().await {
+                match crate::update::update_from_source() {
                     Ok(_) => {
                         println!(
                             "{} Successfully compiled and installed from source",
@@ -656,7 +662,7 @@ async fn async_run() {
                     }
                 }
             } else {
-                match crate::update::perform_update().await {
+                match crate::update::perform_update() {
                     Ok(updated) => {
                         if updated {
                             println!("{} Successfully updated to the latest version", green("✓"));
@@ -732,9 +738,8 @@ targets = ["x86_64-linux"]"#,
     )
     .map_err(|e| e.to_string())?;
     let exe = crate::build::compile_project(pd, "tmp", "x86_64-linux", None)?;
-    let out = std::process::Command::new(&exe)
-        .output()
-        .map_err(|e| e.to_string())?;
+    let mut cmd = std::process::Command::new(&exe);
+    let out = cmd.output().map_err(|e| e.to_string())?;
     if out.status.success() {
         Ok(String::from_utf8_lossy(&out.stdout).to_string())
     } else {
