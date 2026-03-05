@@ -2,7 +2,9 @@
 name = "shiden"
 version = "0.1.2"
 edition = "2024"
+description = "The Shiden Language"
 license = "MIT"
+repository = "https://github.com/idiotstudios/shiden"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
