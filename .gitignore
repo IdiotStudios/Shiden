@@ -7,3 +7,8 @@
 
 # Ignore the generated .bin files from the build script
 libraries/**/*.bin
+
+# .github
+.github/*
+!.github/funding.yml
+!.github/workflows/
