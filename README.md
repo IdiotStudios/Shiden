@@ -145,30 +145,42 @@ Some of the most useful include:
 * [Networking](src/libraries/networking)
 
 
-### Library Architecture
+### Assembly Libraries
 
-Libraries provide helper functions for common tasks. Each library contains hand-written x86-64 bytecode for maximum performance.
+#### Auto Helpers
 
-**Bytecode Format:**
-Library functions are implemented as raw x86-64 machine code embedded as `Vec<u8>` in Rust.
+Building the project with the `auto-helpers` feature (enabled by default)
+will automatically assemble any `*.asm` sources placed under
+`libraries/<category>/<platform>/` and generate the Rust compiler code.
 
-To add a library function:
-1. Create `src/libraries/xyz/mod.rs`
-2. Define your function as a public constant: `pub const FUNCTION_NAME: &[u8] = &[/* x86-64 bytecode */];`
-3. Export it in the library's module
+The build script (`build.rs`) also produces a documentation page at
+`docs/helpers.md` listing all helpers and their binary locations.
 
-**Example:**
-```rust
-// Simple add function in x86-64 bytecode
-// Example bytecode for demonstration purposes only (not actual code)
-pub const add: &[u8] = &[
-    0x55,                   // push rbp
-    0x48, 0x89, 0xe5,       // mov rbp, rsp
-    0x48, 0x89, 0xf8,       // mov rax, rdi
-    0x48, 0x01, 0xf0,       // add rax, rsi
-    0x5d,                   // pop rbp
-    0xc3,                   // ret
-];
+To disable helper generation (e.g. for cross-building) remove the feature:
+
+```sh
+cargo build --no-default-features
+```
+
+#### Installs
+
+Also Install nasm: (feel free to do a pr to update this)
+```bash
+sudo pacman -S nasm # Arch Linux
+sudo apt install nasm # Debian/Ubuntu
+```
+
+Install asmfmt:
+```bash
+go install github.com/klauspost/asmfmt/cmd/asmfmt@latest
+
+# add go to path if not already
+echo 'export PATH="$HOME/go/bin:$PATH"' >> ~/.bashrc
+```
+
+Run it with
+```bash
+find libraries -name '*.asm' -exec asmfmt -w {} +
 ```
 
 ## CLI
