@@ -2211,6 +2211,30 @@ pub fn compile_project(
                 _is_call: false,
             });
         }
+
+        if *name == "fs_list" && !target.contains("windows") {
+            reloc_entries.push(RelocEntry {
+                offset: pos + 6,
+                sym_name: Some(b"array_new".to_vec()),
+                _is_call: false,
+            });
+        }
+
+        if *name == "fs_list_dir" && !target.contains("windows") {
+            reloc_entries.push(RelocEntry {
+                offset: pos + 6,
+                sym_name: Some(b"array_new".to_vec()),
+                _is_call: false,
+            });
+        }
+
+        if *name == "fs_read" && !target.contains("windows") {
+            reloc_entries.push(RelocEntry {
+                offset: pos + 151,
+                sym_name: Some(b"__cstr_to_string".to_vec()),
+                _is_call: false,
+            });
+        }
     }
 
     let exe_path = if target.contains("windows") {

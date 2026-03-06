@@ -1,0 +1,67 @@
+fn new main/
+    println("========================================")/
+    println("Shiden Filesystem Library Demo")/
+    println("========================================")/
+    println("")/
+
+    println("[1] Read seeded file (foo.txt)")/
+    let content = fs read("foo.txt")/str
+    println("Content: {}", content)/
+    println("")/
+
+    println("[2] Write a new file")/
+    let write_result = fs write("output.txt", "Hello, World!")/i64
+    println("Write result: {}", write_result)/
+    println("")/
+
+    println("[3] Check if files exist")/
+    let exists_foo = fs exists("foo.txt")/i64
+    let exists_output = fs exists("output.txt")/i64
+    let exists_missing = fs exists("missing_file.txt")/i64
+    println("foo.txt exists: {}", exists_foo)/
+    println("output.txt exists: {}", exists_output)/
+    println("missing_file.txt exists: {}", exists_missing)/
+    println("")/
+
+    println("[4] Get file size")/
+    let size_foo = fs file_size("foo.txt")/i64
+    let size_output = fs file_size("output.txt")/i64
+    println("foo.txt size: {} bytes", size_foo)/
+    println("output.txt size: {} bytes", size_output)/
+    println("")/
+
+    println("[5] Create a directory")/
+    let mkdir_result = fs mkdir("test_dir")/i64
+    println("mkdir result: {}", mkdir_result)/
+    println("")/
+
+    println("[6] Write file in new directory")/
+    let write_dir = fs write("test_dir/nested.txt", "Nested content")/i64
+    println("Write to test_dir/nested.txt: {}", write_dir)/
+    println("")/
+
+    println("[7] List directory (returns empty array for now)")/
+    let _entries = fs list_dir(".")/array
+    println("Directory listing called successfully")/
+    println("")/
+
+    println("[8] Delete file")/
+    let delete_result = fs delete_file("output.txt")/i64
+    println("Delete output.txt: {}", delete_result)/
+    let exists_after = fs exists("output.txt")/i64
+    println("output.txt exists after delete: {}", exists_after)/
+    println("")/
+
+    println("[9] JSON operations (stubs - return 0)")/
+    let edit_result = fs edit("config.json", "key", "value")/i64
+    let merge_result = fs merge("config.json", "{}")/i64
+    let append_result = fs array_append("data.json", "items", "item")/i64
+    println("fs edit: {}", edit_result)/
+    println("fs merge: {}", merge_result)/
+    println("fs array_append: {}", append_result)/
+    println("")/
+
+    println("========================================")/
+    println("Filesystem demo complete!")/
+    println("========================================")/
+fn/
