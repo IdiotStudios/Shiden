@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'website/**'
+      - 'docs/**'
   workflow_dispatch:
 
 concurrency:
@@ -27,6 +28,11 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Copy over docs
+        run: |
+          mkdir -p website/docs
+          cp -r docs/* website/docs/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
