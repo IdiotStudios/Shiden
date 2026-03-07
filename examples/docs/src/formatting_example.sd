@@ -14,7 +14,7 @@ fn new demonstrate_indentation/
     if/
 fn/
 
-fn new demonstrate_function_calls/
+fn new demonstrate function calls/
     println("No space before parentheses")/
     add(1, 2)/
     multiply(3, 4, 5)/
