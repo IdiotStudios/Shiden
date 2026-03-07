@@ -9,6 +9,9 @@ Shiden is a high-performance ahead-of-time compiled language focused on speed, p
 ## NOTE:
 Shiden is in early development and is not yet stable. Expect breaking changes and missing features. Contributions and feedback are welcome! Also I am in the process of rewriting teh rust implementation in ASM so expect some instability and missing features for a while. Release [v0.1.2](https://github.com/IdiotStudios/Shiden/releases/tag/v0.1.2) is the stable rust release, but the asm release is still in progress.
 
+## To the Shipwright reviewing my project
+The repo is being refactored so you can view the rust source code in `compiler/rust_backup`. and the you can run it by downloading the relevant files for your OS from gh releases v0.1.2. The exe/binary are cli tools not GUI to
+
 ## Features
 
 - Ahead-of-time compilation
