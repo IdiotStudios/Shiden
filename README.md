@@ -6,37 +6,8 @@
 
 Shiden is a high-performance ahead-of-time compiled language focused on speed, predictability, and low-level control, with a syntax familiar to Rust and JavaScript.
 
-Fast • Predictable • Minimal
-
 ## NOTE:
 Shiden is in early development and is not yet stable. Expect breaking changes and missing features. Contributions and feedback are welcome! Also I am in the process of rewriting teh rust implementation in ASM so expect some instability and missing features for a while. Release [v0.1.2](https://github.com/IdiotStudios/Shiden/releases/tag/v0.1.2) is the stable rust release, but the asm release is still in progress.
-
-#### Hello World — Example
-(em-dashes ❤️)
-
-```shiden
-fn new main/
-    println("Hello, world!")/
-fn/
-```
-
-Run it with:
-```bash
-shiden run src/main.sd
-```
-
-#### Quick Example
-```shiden
-fn new main/
-
-    let nums = [1,2,3,4]/
-
-    for n in nums/
-        println(n)/
-    fn/
-
-fn/
-```
 
 ## Features
 
@@ -45,22 +16,6 @@ fn/
 - Built-in low-level system primitives
 - Built-in libraries implemented as optimized x86-64 machine code
 - Fast startup and predictable performance
-
-## Benchmarks
-
-All benchmarks are run on GitHub Actions and my local machine.  
-My machine uses an Intel i7-4770K CPU with 16GB of RAM on Arch Linux.  
-Benchmarks are averages based off scripts in the `benchmarks/` directory.  
-All Benchmarks are avearge of 1000 runs.
-
-### **THIS IS A WORK IN PROGRESS!**
-
-### Hello World
-
-| Environment | Shiden | Rust | Assembly | Node.js | Python |
-|-------------|-----:|-----:|-----:|-----:|-----:|
-| Local | ns | ns | ns | ms | ms |
-| GitHub | ns | ns | ns | ms | ms |
 
 ## Why Shiden?
 
@@ -80,10 +35,10 @@ Shiden aims to combine the performance and control of Rust with the simplicity o
 
 | Platform | Arch | Support | Phase |
 | :--- | :---: | :---: | ---: |
-| `linux` | x86_64 | Yes | Stable |
-| `linux` | arm | No | Planned |
-| `windows` | x86_64 | Yes | Beta |
-| `macos` | N/A | No | Planned |
+| `linux` | x86_64 | No | N/A |
+| `linux` | arm | No | N/A |
+| `windows` | x86_64 | No | N/A |
+| `macos` | N/A | No | N/A |
 More architectures and platforms are planned.
 
 ### Random Thought
@@ -91,36 +46,7 @@ GitHub should add polls to repos. That would be peak.
 
 ## Installation
 
-### Quick Start
-
-**Linux/macOS:**
-```bash
-curl -fsSL https://raw.githubusercontent.com/IdiotStudios/Shiden/main/install.sh | bash
-```
-
-**Windows (PowerShell):**
-```powershell
-powershell -ExecutionPolicy Bypass -File (iwr https://raw.githubusercontent.com/IdiotStudios/Shiden/main/install.ps1 -UseBasicParsing).Content
-```
-
-**Crates.io:** (Will work in next release ~1-2d)
-```bash
-cargo install shiden
-```
-
-### Auto-Updates
-
-Check for updates:
-```bash
-shiden update --check
-```
-
-Install latest version:
-```bash
-shiden update
-```
-
-See [INSTALL.md](https://shiden.arson.dev/docs/#installation) for detailed installation instructions and troubleshooting.
+### Going to be added soon
 
 ## Ecosystem
 
@@ -130,61 +56,6 @@ See [INSTALL.md](https://shiden.arson.dev/docs/#installation) for detailed insta
 - 📦 **[Shiden-Package-Registry]()** (hint...)  
 - 🧪 **[Benchmarks]()** (hmm very soon)  
 (thanks kde emoji picker)
-
-## Todo
-
-1. Improved error messages with code snippets and suggestions
-2. Unsafe code blocks for low-level operations
-3. Better testing framework and support for unit/integration tests
-4. Performance optimizations and benchmarking tools
-5. Support for more data types and features (enums, traits, async/await, etc.)
-
-## Libraries
-
-Shiden includes built-in libraries.
-Some of the most useful include:
-
-* [Filesystem](src/libraries/filesystem)
-* [Networking](src/libraries/networking)
-
-
-### Assembly Libraries
-
-#### Auto Helpers
-
-Building the project with the `auto-helpers` feature (enabled by default)
-will automatically assemble any `*.asm` sources placed under
-`libraries/<category>/<platform>/` and generate the Rust compiler code.
-
-The build script (`build.rs`) also produces a documentation page at
-`docs/helpers.md` listing all helpers and their binary locations.
-
-To disable helper generation (e.g. for cross-building) remove the feature:
-
-```sh
-cargo build --no-default-features
-```
-
-#### Installs
-
-Also Install nasm: (feel free to do a pr to update this)
-```bash
-sudo pacman -S nasm # Arch Linux
-sudo apt install nasm # Debian/Ubuntu
-```
-
-Install asmfmt:
-```bash
-go install github.com/klauspost/asmfmt/cmd/asmfmt@latest
-
-# add go to path if not already
-echo 'export PATH="$HOME/go/bin:$PATH"' >> ~/.bashrc
-```
-
-Run it with
-```bash
-find libraries -name '*.asm' -exec asmfmt -w {} +
-```
 
 ## CLI
 | Command | Description | Status |
@@ -216,6 +87,7 @@ my_project/
 ## Contributing
 
 If you do wanna contribute then feel free to create issues or pull requests! Love the support.
+Also Checkout the [CONTRIBUTING.md](CONTRIBUTING.md) for more details on how to contribute.
 
 ## License
 
