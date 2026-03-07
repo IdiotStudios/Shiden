@@ -10,7 +10,7 @@
 - [x] `break` and `continue` behavior in loops
 - [x] Function returns in docs example (`return 42`, `return a + b`)
 - [x] Dynamic array element lookup after `push` (`dynamic[1]`)
-- [ ] `len(dynamic)` as a direct `println` argument still unresolved in formatter path
+- [x] `len(dynamic)` as a direct `println` argument in formatter path
 
 ## libraries
 
