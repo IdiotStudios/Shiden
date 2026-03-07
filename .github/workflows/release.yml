@@ -170,6 +170,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   crates-release:
+    needs: publish-release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
