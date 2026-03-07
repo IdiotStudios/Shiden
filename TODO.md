@@ -1,17 +1,5 @@
 # Todo
 
-## Compiler parity (linux asm)
-
-- [x] Array index literals resolve correctly (`arr[0]`, `arr[1]`, `arr[2]`)
-- [x] Array index assignment works (`arr[i] = value`)
-- [x] `if / else` execution in docs example
-- [x] `while` execution in docs example
-- [x] `for` execution in docs example
-- [x] `break` and `continue` behavior in loops
-- [x] Function returns in docs example (`return 42`, `return a + b`)
-- [x] Dynamic array element lookup after `push` (`dynamic[1]`)
-- [x] `len(dynamic)` as a direct `println` argument in formatter path
-
 ## libraries
 
 - [ ] `Graphics` - 2D graphics library with software rendering backend
