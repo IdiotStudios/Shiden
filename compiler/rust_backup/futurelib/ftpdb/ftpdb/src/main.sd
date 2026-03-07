@@ -1,0 +1,49 @@
+fn new main/
+    println("FTPDB API Example")/
+    println("Fetching data from https://ftpdb.jam06452.uk/api")/
+
+    println("")/
+    println("=== Hot Projects (Trending) ===")/
+    let hot_ptr = ftpdb hot()/i64
+    let hot = __cstr_to_string(hot_ptr)/str
+    println("Response: {}", hot)/
+
+    println("")/
+    println("=== Top Projects This Week ===")/
+    let weekly_ptr = ftpdb top this week()/i64
+    let weekly = __cstr_to_string(weekly_ptr)/str
+    println("Response: {}", weekly)/
+
+    println("")/
+    println("=== Fan Favourite Projects ===")/
+    let favorites_ptr = ftpdb fan favourites()/i64
+    let favorites = __cstr_to_string(favorites_ptr)/str
+    println("Response: {}", favorites)/
+
+    println("")/
+    println("=== Top Projects All Time ===")/
+    let alltime_ptr = ftpdb top all time()/i64
+    let alltime = __cstr_to_string(alltime_ptr)/str
+    println("Response: {}", alltime)/
+
+    println("")/
+    println("=== Random Devlogs ===")/
+    let devlogs_ptr = ftpdb random devlogs()/i64
+    let devlogs = __cstr_to_string(devlogs_ptr)/str
+    println("Response: {}", devlogs)/
+
+    println("")/
+    println("=== Random Projects ===")/
+    let random_projects_ptr = ftpdb random projects()/i64
+    let random_projects = __cstr_to_string(random_projects_ptr)/str
+    println("Response: {}", random_projects)/
+
+    println("")/
+    println("=== Top Contributors ===")/
+    let contributors_ptr = ftpdb most time spent()/i64
+    let contributors = __cstr_to_string(contributors_ptr)/str
+    println("Response: {}", contributors)/
+
+    println("")/
+    println("Example completed!")/
+fn/

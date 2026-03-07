@@ -1,0 +1,12 @@
+# shiden.toml - project manifest
+[project]
+name = "ftpdb-api-example"
+version = "0.1.0"
+type = "binary"
+
+[build]
+opt_level = 3
+targets = ["x86_64-linux"]
+
+[dependencies]
+# "pkg" = "version"
