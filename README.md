@@ -189,10 +189,10 @@ find libraries -name '*.asm' -exec asmfmt -w {} +
 ## CLI
 | Command | Description | Status |
 | :--- | :--- | :---: |
-| `shiden parse` | parses Shiden files | deprecating |
 | `shiden run` | release mode by default, add `--debug` for debug mode | ✅ |
 | `shiden check` | runs checks | ✅ |
 | `shiden new {name}` | creates a new project | ✅ |
+| `shiden init` | initializes project in current directory | ✅ |
 | `shiden compile` | compiles Shiden (run does the same anyway) | ✅ |
 | `shiden help` | shows help | ✅ |
 
