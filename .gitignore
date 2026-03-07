@@ -1,12 +1,4 @@
-/target
-/examples/**/build/
 .vscode
-
-# Ignore futurelib
-/rust_backup/futurelib
-
-# Ignore the generated .bin files from the build script
-libraries/**/*.bin
 
 # .github
 .github/*
