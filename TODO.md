@@ -19,7 +19,7 @@
 
 ## Targets
 
-- [ ] `linux-x86_64`
+- [x] `linux-x86_64`
 - [ ] `linux-arm`
 - [ ] `windows-x86_64`
 - [ ] `macos-x86_64`
