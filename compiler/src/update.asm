@@ -6,11 +6,10 @@ section .data
 
 section .text
     global update_check
+    extern rt_print
 
 update_check:
-    mov rax, 1            ; write
-    mov rdi, 1            ; stdout
     lea rsi, [update_msg]
     mov rdx, update_msg_len
-    syscall
+    call rt_print
     ret

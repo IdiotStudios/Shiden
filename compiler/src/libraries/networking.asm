@@ -6,11 +6,10 @@ section .data
 
 section .text
     global networking_init
+    extern rt_print
 
 networking_init:
-    mov rax, 1            ; write
-    mov rdi, 1            ; stdout
     lea rsi, [net_msg]
     mov rdx, net_msg_len
-    syscall
+    call rt_print
     ret

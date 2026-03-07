@@ -16,14 +16,30 @@ section .data
     msg_run_len equ $ - msg_run
     msg_check db "[stub] Checking Shiden code...", 0xA
     msg_check_len equ $ - msg_check
+    msg_check_ok db "[ok] Lex pass", 0xA
+    msg_check_ok_len equ $ - msg_check_ok
+    msg_parse_ok db "[ok] Parse pass", 0xA
+    msg_parse_ok_len equ $ - msg_parse_ok
+    msg_check_fail db "[error] Lex failed", 0xA
+    msg_check_fail_len equ $ - msg_check_fail
+    msg_parse_fail db "[error] Parse failed", 0xA
+    msg_parse_fail_len equ $ - msg_parse_fail
+    msg_check_read_fail db "[error] Could not read source file", 0xA
+    msg_check_read_fail_len equ $ - msg_check_read_fail
     msg_new db "[stub] Creating new project...", 0xA
     msg_new_len equ $ - msg_new
     msg_init db "[stub] Initializing project...", 0xA
     msg_init_len equ $ - msg_init
     msg_compile db "[stub] Compiling project...", 0xA
     msg_compile_len equ $ - msg_compile
+    msg_run_chdir_fail db "[error] Could not enter run directory", 0xA
+    msg_run_chdir_fail_len equ $ - msg_run_chdir_fail
+    msg_compile_chdir_fail db "[error] Could not enter compile directory", 0xA
+    msg_compile_chdir_fail_len equ $ - msg_compile_chdir_fail
     msg_update db "[stub] Checking for updates...", 0xA
     msg_update_len equ $ - msg_update
+
+    default_check_path db "examples/docs/src/main.sd", 0
     
     help_text db "Usage: shiden <command> [options]", 0xA, 0xA
     help_text2 db "Commands:", 0xA
@@ -48,10 +64,22 @@ section .bss
 
 section .text
     global cli_main
+    extern runtime_init
+    extern rt_print
+    extern rt_streq
     extern update_check
     extern frontend_parse
+    extern frontend_parse_tokens
     extern syntax_lex
+    extern syntax_lex_buffer
     extern build_compile
+    extern build_run
+    extern filesystem_read_file
+    extern config_load_ini
+    extern config_get_project_name
+    extern config_get_targets
+    extern config_get_opt_level
+    extern config_get_debug
 
 cli_main:
     push rbp
@@ -62,127 +90,209 @@ cli_main:
     
     mov rbx, rdi      ; argc
     mov r12, rsi      ; argv
+
+    call runtime_init
     
-    mov rax, 1            ; write
-    mov rdi, 1            ; stdout
     lea rsi, [banner]
     mov rdx, banner_len
-    syscall
+    call rt_print
     
     cmp rbx, 1
     jle .show_help
     
     mov r13, [r12 + 8]    ; argv[1] - command
     
-    lea rdi, [r13]
+    mov rdi, r13
     lea rsi, [cmd_run]
-    call strcmp
+    call rt_streq
     test rax, rax
     jz .do_run
     
-    lea rdi, [r13]
+    mov rdi, r13
     lea rsi, [cmd_check]
-    call strcmp
+    call rt_streq
     test rax, rax
     jz .do_check
     
-    lea rdi, [r13]
+    mov rdi, r13
     lea rsi, [cmd_new]
-    call strcmp
+    call rt_streq
     test rax, rax
     jz .do_new
     
-    lea rdi, [r13]
+    mov rdi, r13
     lea rsi, [cmd_init]
-    call strcmp
+    call rt_streq
     test rax, rax
     jz .do_init
     
-    lea rdi, [r13]
+    mov rdi, r13
     lea rsi, [cmd_compile]
-    call strcmp
+    call rt_streq
     test rax, rax
     jz .do_compile
     
-    lea rdi, [r13]
+    mov rdi, r13
     lea rsi, [cmd_help]
-    call strcmp
+    call rt_streq
     test rax, rax
     jz .show_help
     
-    lea rdi, [r13]
+    mov rdi, r13
     lea rsi, [cmd_update]
-    call strcmp
+    call rt_streq
     test rax, rax
     jz .do_update
 
 .show_help:
     lea rsi, [help_text]
     mov rdx, help_len1
-    call print
+    call rt_print
     lea rsi, [help_text2]
     mov rdx, help_len2
-    call print
+    call rt_print
     lea rsi, [help_text3]
     mov rdx, help_len3
-    call print
+    call rt_print
     lea rsi, [help_text4]
     mov rdx, help_len4
-    call print
+    call rt_print
     lea rsi, [help_text5]
     mov rdx, help_len5
-    call print
+    call rt_print
     lea rsi, [help_text6]
     mov rdx, help_len6
-    call print
+    call rt_print
     lea rsi, [help_text7]
     mov rdx, help_len7
-    call print
+    call rt_print
     lea rsi, [help_text8]
     mov rdx, help_len8
-    call print
+    call rt_print
     lea rsi, [help_text9]
     mov rdx, help_len9
-    call print
+    call rt_print
     jmp .done
 
 .do_run:
+    cmp rbx, 2
+    jle .run_print
+
+    mov rax, 80
+    mov rdi, [r12 + 16]
+    syscall
+    test rax, rax
+    js .run_chdir_fail
+
+.run_print:
     lea rsi, [msg_run]
     mov rdx, msg_run_len
-    call print
+    call rt_print
     call build_compile
+    call build_run
+    jmp .done
+
+.run_chdir_fail:
+    lea rsi, [msg_run_chdir_fail]
+    mov rdx, msg_run_chdir_fail_len
+    call rt_print
     jmp .done
 
 .do_check:
     lea rsi, [msg_check]
     mov rdx, msg_check_len
-    call print
-    call syntax_lex
+    call rt_print
+
+    cmp rbx, 2
+    jg .check_path_arg
+    lea rdi, [default_check_path]
+    jmp .check_read
+
+.check_path_arg:
+    mov rdi, [r12 + 16]
+
+.check_read:
+    call filesystem_read_file
+    test rax, rax
+    jz .check_read_fail
+
+    mov rdi, rax
+    mov rsi, rdx
+    mov r13, rax
+    call syntax_lex_buffer
+    test rax, rax
+    jnz .check_fail
+
+    lea rsi, [msg_check_ok]
+    mov rdx, msg_check_ok_len
+    call rt_print
+
+    call frontend_parse_tokens
+    test rax, rax
+    jnz .parse_fail
+
+    lea rsi, [msg_parse_ok]
+    mov rdx, msg_parse_ok_len
+    call rt_print
+    jmp .done
+
+.check_read_fail:
+    lea rsi, [msg_check_read_fail]
+    mov rdx, msg_check_read_fail_len
+    call rt_print
+    jmp .done
+
+.check_fail:
+    lea rsi, [msg_check_fail]
+    mov rdx, msg_check_fail_len
+    call rt_print
+    jmp .done
+
+.parse_fail:
+    lea rsi, [msg_parse_fail]
+    mov rdx, msg_parse_fail_len
+    call rt_print
     jmp .done
 
 .do_new:
     lea rsi, [msg_new]
     mov rdx, msg_new_len
-    call print
+    call rt_print
     jmp .done
 
 .do_init:
     lea rsi, [msg_init]
     mov rdx, msg_init_len
-    call print
+    call rt_print
     jmp .done
 
 .do_compile:
+    cmp rbx, 2
+    jle .compile_print
+
+    mov rax, 80
+    mov rdi, [r12 + 16]
+    syscall
+    test rax, rax
+    js .compile_chdir_fail
+
+.compile_print:
     lea rsi, [msg_compile]
     mov rdx, msg_compile_len
-    call print
+    call rt_print
     call build_compile
+    jmp .done
+
+.compile_chdir_fail:
+    lea rsi, [msg_compile_chdir_fail]
+    mov rdx, msg_compile_chdir_fail_len
+    call rt_print
     jmp .done
 
 .do_update:
     lea rsi, [msg_update]
     mov rdx, msg_update_len
-    call print
+    call rt_print
     call update_check
     jmp .done
 
@@ -191,29 +301,4 @@ cli_main:
     pop r12
     pop rbx
     pop rbp
-    ret
-
-print:
-    mov rax, 1            ; write
-    mov rdi, 1            ; stdout
-    syscall
-    ret
-
-strcmp:
-    xor rax, rax
-.loop:
-    mov al, [rdi]
-    mov cl, [rsi]
-    cmp al, cl
-    jne .not_equal
-    test al, al
-    jz .equal
-    inc rdi
-    inc rsi
-    jmp .loop
-.equal:
-    xor rax, rax
-    ret
-.not_equal:
-    mov rax, 1
     ret

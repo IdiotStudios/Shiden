@@ -6,11 +6,10 @@ section .data
 
 section .text
     global libraries_init
+    extern rt_print
 
 libraries_init:
-    mov rax, 1            ; write
-    mov rdi, 1            ; stdout
     lea rsi, [lib_msg]
     mov rdx, lib_msg_len
-    syscall
+    call rt_print
     ret

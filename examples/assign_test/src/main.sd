@@ -1,0 +1,6 @@
+fn new main/
+    let mut mutable = 5/i64
+    println("before {}", mutable)/
+    mutable = mutable + 3/
+    println("after {}", mutable)/
+fn/
