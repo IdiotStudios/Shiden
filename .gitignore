@@ -3,7 +3,7 @@
 .vscode
 
 # Ignore futurelib
-/futurelib
+/rust_backup/futurelib
 
 # Ignore the generated .bin files from the build script
 libraries/**/*.bin
