@@ -21,29 +21,23 @@
   <meta property="og:url" content="https://shiden.arson.dev/docs/">
   <meta property="og:image" content="https://shiden.arson.dev/assets/shiden-social.png">
   <meta name="twitter:card" content="summary_large_image">
-</head>
 
+  <!-- Docsify -->
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4"></script>
+</head>
 <body>
   <div id="site-header"></div>
   <script type="module" src="/script.js"></script>
 
-  <div class="docs-container">
-    <aside class="docs-sidebar">
-      <div class="sidebar-header">
-        <h2>Documentation</h2>
-        <input type="text" id="docs-search" class="docs-search" placeholder="Search docs...">
-      </div>
-      <nav id="docs-nav" class="docs-nav">
-        <div class="loading">Loading documentation...</div>
-      </nav>
-    </aside>
-
-    <main class="docs-content">
-      <div id="doc-display">
-        <div class="loading">Select a document from the sidebar</div>
-      </div>
-    </main>
-  </div>
+  <div id="app"></div>
+  <script>
+    window.$docsify = {
+      name: 'Shiden Docs',
+      repo: 'https://github.com/idiotstudios/shiden/docs',
+      loadSidebar: true,
+      subMaxLevel: 2
+    };
+  </script>
 
   <div id="site-footer"></div>
   <script type="module" src="/docs/docs.js"></script>
