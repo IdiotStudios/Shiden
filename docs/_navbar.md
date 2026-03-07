@@ -1,5 +1,5 @@
 * Getting Started
-  * [Home](index.md)
+  * [Home](README.md)
   * [Installation](installation.md)
   * [Ecosystem](ecosystem.md)
 * Language
