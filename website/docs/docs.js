@@ -10,6 +10,7 @@ const CATEGORIES = {
   'Language': [
     'syntax',
     'types',
+    'types-reference',
     'variables',
     'functions',
     'expressions',
@@ -17,7 +18,9 @@ const CATEGORIES = {
     'modules',
     'formatting'
   ],
-  'Standard Library': ['standard-library']
+  'Standard Library': [
+    'standard-library'
+  ]
 };
 
 const docsCache = {};

@@ -1,0 +1,11 @@
+fn new main/
+    let age = 25/i64
+    let name = "Alice"/str
+    let score = 100/i64
+    let city = "Tokyo"/str
+    
+    println("Single: {}", age)/
+    println("Two: {} and {}", age, score)/
+    println("Three: {}, {}, {}", name, city, age)/
+    println("Mixed: {} from {} scored {}", name, city, score)/
+fn/
