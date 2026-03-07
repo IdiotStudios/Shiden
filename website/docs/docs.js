@@ -1,7 +1,3 @@
-const GITHUB_REPO = 'IdiotStudios/Shiden';
-const GITHUB_BRANCH = 'main';
-const DOCS_PATH = 'docs';
-
 const CATEGORIES = {
   'Getting Started': [
     'index',
@@ -36,7 +32,7 @@ async function fetchMarkdown(filename) {
     return docsCache[filename];
   }
 
-  const url = `https://raw.githubusercontent.com/${GITHUB_REPO}/${GITHUB_BRANCH}/${DOCS_PATH}/${filename}.md`;
+  const url = `/docs/${filename}.md`;
   
   try {
     const response = await fetch(url);
