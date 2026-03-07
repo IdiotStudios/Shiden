@@ -6,7 +6,7 @@ if (-Not (Test-Path -Path $OutputDir)) {
     New-Item -ItemType Directory -Path $OutputDir
 }
 
-Get-ChildItem -Path $AsmDir -Filter "*.asm" | ForEach-Object {
+Get-ChildItem -Path $AsmDir -Recurse -Filter "*.asm" | ForEach-Object {
     $BaseName = $_.BaseName
 
     # Compile to ELF binary
