@@ -21,7 +21,9 @@
 
 - [x] `linux-x86_64`
 - [ ] `linux-arm`
-- [ ] `windows-x86_64`
+- [ ] `windows-x86_64` - WIP: WinAPI port in place, compile/run no longer crash, still failing to read project source paths
+- [ ] `windows-arm`
+- [ ] `v86` - supposedly better than asm
 - [ ] `macos-x86_64`
 - [ ] `macos-arm64`
 - [ ] `wasm32`
