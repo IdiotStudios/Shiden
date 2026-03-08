@@ -69,7 +69,15 @@ FINAL_PE_BINARY="$OUTPUT_DIR/shiden.exe"
 ELF_ENTRY_FILE="$OUTPUT_DIR/main.o"
 ELF_OBJ_FILES=$(find "$OUTPUT_DIR" -type f -name "*.o" ! -name "main.o")
 
-ld -o "$FINAL_ELF_BINARY" "$ELF_ENTRY_FILE" $ELF_OBJ_FILES
+# Detect OS and set flags
+if [ "$(uname)" = "Darwin" ]; then
+    # macOS requires -arch flag (because archlinux is better)
+    ARCH=$(uname -m)
+    ld -arch "$ARCH" -o "$FINAL_ELF_BINARY" "$ELF_ENTRY_FILE" $ELF_OBJ_FILES
+else
+    # Linux uses nomral ld
+    ld -o "$FINAL_ELF_BINARY" "$ELF_ENTRY_FILE" $ELF_OBJ_FILES
+fi
 
 echo "Final ELF binary created at $FINAL_ELF_BINARY"
 
