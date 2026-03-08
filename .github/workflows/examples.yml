@@ -78,7 +78,7 @@ jobs:
             $exitCode = $LASTEXITCODE
             Pop-Location
             if ($exitCode -ne 0) {
-              $hexCode = '0x{0:X8}' -f ([uint32]($exitCode -band 0xFFFFFFFF))
+              $hexCode = '0x{0:X8}' -f ([long]$exitCode -band 0xFFFFFFFFL)
               Write-Host "Failed to build $($example.Name) (exit $exitCode / $hexCode)" -ForegroundColor Red
               $failed += $example.Name
             }
