@@ -92,11 +92,15 @@ if ($BuildPE -eq 1) {
     $PeEntryFile = Join-Path $OutputDir "main.obj"
     $PeObjFiles = @(Get-ChildItem -Path $OutputDir -Filter "*.obj" | Where-Object { $_.Name -ne "main.obj" })
     
-    $GccArgs = @("-o", $FinalPeBinary, $PeEntryFile) + @($PeObjFiles | ForEach-Object { $_.FullName }) + @("-lkernel32", "-lshell32", "-nostdlib", "-Wl,--subsystem,console", "-Wl,--image-base,0x400000")
-    & x86_64-w64-mingw32-gcc @GccArgs
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    
-    Write-Host "Final Windows EXE created at $FinalPeBinary"
+    $GccPath = Get-Command x86_64-w64-mingw32-gcc -ErrorAction SilentlyContinue
+    if ($GccPath) {
+        $GccArgs = @("-o", $FinalPeBinary, $PeEntryFile) + @($PeObjFiles | ForEach-Object { $_.FullName }) + @("-lkernel32", "-lshell32", "-nostdlib", "-Wl,--subsystem,console", "-Wl,--image-base,0x400000")
+        & x86_64-w64-mingw32-gcc @GccArgs
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+        Write-Host "Final Windows EXE created at $FinalPeBinary"
+    } else {
+        Write-Host "Warning: x86_64-w64-mingw32-gcc not found. PE linking skipped. Install mingw-w64 or Visual Studio to build Windows executables."
+    }
 }
 
 Write-Host "Compilation complete. Static library created at $LibraryFile"

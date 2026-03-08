@@ -76,8 +76,13 @@ echo "Final ELF binary created at $FINAL_ELF_BINARY"
 if [ "$BUILD_PE" = "1" ]; then
     PE_ENTRY_FILE="$OUTPUT_DIR/main.obj"
     PE_OBJ_FILES=$(find "$OUTPUT_DIR" -type f -name "*.obj" ! -name "main.obj")
-    x86_64-w64-mingw32-gcc -o "$FINAL_PE_BINARY" "$PE_ENTRY_FILE" $PE_OBJ_FILES -lkernel32 -lshell32 -nostdlib -Wl,--subsystem,console -Wl,--image-base,0x400000
-    echo "Final Windows EXE created at $FINAL_PE_BINARY"
+    
+    if command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1; then
+        x86_64-w64-mingw32-gcc -o "$FINAL_PE_BINARY" "$PE_ENTRY_FILE" $PE_OBJ_FILES -lkernel32 -lshell32 -nostdlib -Wl,--subsystem,console -Wl,--image-base,0x400000
+        echo "Final Windows EXE created at $FINAL_PE_BINARY"
+    else
+        echo "Warning: x86_64-w64-mingw32-gcc not found. PE linking skipped. Install mingw-w64 to build Windows executables."
+    fi
 fi
 
 echo "Compilation complete. Static library created at $LIBRARY_FILE"
