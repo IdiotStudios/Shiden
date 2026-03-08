@@ -70,7 +70,7 @@ jobs:
         run: |
           foreach ($example in Get-ChildItem examples -Directory) {
             $name = $example.Name
-            $binary = "$($example.FullName)\build\x86_64-windows\$name.exe"
+            $binary = "$($example.FullName)\build\windows\$name.exe"
             if (Test-Path $binary) {
               Write-Host "Running $binary..."
               & $binary
