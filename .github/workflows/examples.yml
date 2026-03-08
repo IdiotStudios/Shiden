@@ -37,7 +37,7 @@ jobs:
           for example in examples/*; do
             if [ -d "$example" ]; then
               EXAMPLE_NAME=$(basename "$example")
-              BINARY="$example/build/x86_64-linux/$EXAMPLE_NAME"
+              BINARY="$example/build/linux/$EXAMPLE_NAME"
               if [ -f "$BINARY" ]; then
                 echo "Running $BINARY..."
                 "$BINARY"
@@ -97,7 +97,7 @@ jobs:
           for example in examples/*; do
             if [ -d "$example" ]; then
               EXAMPLE_NAME=$(basename "$example")
-              BINARY="$example/build/x86_64-macos/$EXAMPLE_NAME"
+              BINARY="$example/build/macos/$EXAMPLE_NAME"
               if [ -f "$BINARY" ]; then
                 echo "Running $BINARY..."
                 "$BINARY"
