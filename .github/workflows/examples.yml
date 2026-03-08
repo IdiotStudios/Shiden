@@ -1,0 +1,90 @@
+name: Examples Tests
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Only one concurrent run of this workflow at a time
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile compiler
+        run: sh ./compiler/compile.sh
+
+      - name: Build examples
+        run: |
+          for example in examples/*; do
+            if [ -d "$example" ]; then
+              echo "Building $example..."
+              sh ./compiler/asm_output/shiden compile "$example"
+            fi
+          done
+
+      - name: Run examples
+        run: |
+          for example in examples/*; do
+            if [ -d "$example" ]; then
+              echo "Running $example..."
+              sh "./examples/$(basename "$example")"
+            fi
+          done
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile compiler
+        run: .\compiler\compile.ps1
+
+      - name: Build examples
+        run: |
+          for example in examples/*; do
+            if [ -d "$example" ]; then
+              echo "Building $example..."
+              .\compiler\asm_output\shiden.exe compile "$example"
+            fi
+          done
+
+      - name: Run examples
+        run: |
+          for example in examples/*; do
+            if [ -d "$example" ]; then
+              echo "Running $example..."
+              .\examples\$(basename "$example").exe
+            fi
+          done
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile compiler
+        run: sh ./compiler/compile.sh
+
+      - name: Build examples
+        run: |
+          for example in examples/*; do
+            if [ -d "$example" ]; then
+              echo "Building $example..."
+              sh ./compiler/asm_output/shiden compile "$example"
+            fi
+          done
+
+      - name: Run examples
+        run: |
+          for example in examples/*; do
+            if [ -d "$example" ]; then
+              echo "Running $example..."
+              sh "./examples/$(basename "$example")"
+            fi
+          done
+  # TODO: add windows-arm and linux-arm jobs once those targets are supported
