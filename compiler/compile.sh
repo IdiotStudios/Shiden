@@ -17,6 +17,13 @@ if [ -z "$(find "$ASM_DIR" -type f -name "*.asm")" ]; then
     exit 1
 fi
 
+# Detect mac because its very special...
+if [ "$(uname)" = "Darwin" ]; then
+    OBJ_FORMAT="macho64"
+else
+    OBJ_FORMAT="elf64"
+fi
+
 find "$ASM_DIR" -type f -name "*.asm" | while IFS= read -r ASM_FILE; do
     RELATIVE_PATH=${ASM_FILE#"$ASM_DIR"/}
     MODULE_STEM=${RELATIVE_PATH%.asm}
@@ -26,8 +33,8 @@ find "$ASM_DIR" -type f -name "*.asm" | while IFS= read -r ASM_FILE; do
         *"_windows.asm") ;;
         *)
             OUTPUT_FILE_ELF="$OUTPUT_DIR/$OUTPUT_BASENAME.o"
-            echo "Assembling $ASM_FILE -> $OUTPUT_FILE_ELF (ELF object)"
-            nasm -w-label-redef-late -f elf64 "$ASM_FILE" -o "$OUTPUT_FILE_ELF"
+            echo "Assembling $ASM_FILE -> $OUTPUT_FILE_ELF ($OBJ_FORMAT object)"
+            nasm -w-label-redef-late -f "$OBJ_FORMAT" "$ASM_FILE" -o "$OUTPUT_FILE_ELF"
             ;;
     esac
 done
