@@ -58,3 +58,11 @@
 
 - [ ] `Benchmarks` - comprehensive benchmarks comparing Shiden to other languages
 - [x] `Examples` - collection of example projects demonstrating various features of Shiden
+- [ ] `Git Support` - built in git support for new projects (git init, add, commit, etc)
+- [ ] `CI/CD` - set up continuous integration and deployment for Shiden projects
+- [ ] `Community` - build a community around Shiden with forums, chat, etc
+- [ ] `More Examples` - more example projects demonstrating various features of Shiden
+- [ ] `Better Docs` - improve documentation with more examples, better explanations, etc
+- [ ] `More Libraries` - add more standard libraries for various use cases
+- [ ] `More Targets` - add support for more platforms and architectures
+- [ ] `More Tooling` - add more tools for working with Shiden projects
