@@ -2,6 +2,10 @@ default rel
 
 section .data
 
+section .bss
+    alignb 4
+    rt_bytes_written resd 1
+
 section .text
     global runtime_init
     global rt_write
@@ -36,8 +40,8 @@ rt_write:
     mov rcx, rax
     mov rdx, r12
     mov r8, rbx
-    lea r9, [rsp + 40]
-    mov dword [rsp + 40], 0
+    lea r9, [rel rt_bytes_written]
+    mov dword [rel rt_bytes_written], 0
     mov qword [rsp + 32], 0
     call WriteFile
 

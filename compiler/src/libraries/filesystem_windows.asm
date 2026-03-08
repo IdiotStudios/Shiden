@@ -5,7 +5,9 @@ section .data
     fs_msg_len equ $ - fs_msg
 
 section .bss
+    alignb 8
     fs_read_buffer resb 131072
+    alignb 4
     fs_bytes_read resd 1
 
 section .text
