@@ -17,42 +17,46 @@ if [ -z "$(find "$ASM_DIR" -type f -name "*.asm")" ]; then
     exit 1
 fi
 
-while IFS= read -r ASM_FILE; do
+find "$ASM_DIR" -type f -name "*.asm" | while IFS= read -r ASM_FILE; do
     RELATIVE_PATH=${ASM_FILE#"$ASM_DIR"/}
     MODULE_STEM=${RELATIVE_PATH%.asm}
     OUTPUT_BASENAME=$(echo "$MODULE_STEM" | tr '/' '_')
 
-    if [[ "$ASM_FILE" == *"_windows.asm" ]]; then
-        continue
-    fi
-
-    OUTPUT_FILE_ELF="$OUTPUT_DIR/$OUTPUT_BASENAME.o"
-
-    echo "Assembling $ASM_FILE -> $OUTPUT_FILE_ELF (ELF object)"
-    nasm -w-label-redef-late -f elf64 "$ASM_FILE" -o "$OUTPUT_FILE_ELF"
-done < <(find "$ASM_DIR" -type f -name "*.asm")
+    case "$ASM_FILE" in
+        *"_windows.asm") ;;
+        *)
+            OUTPUT_FILE_ELF="$OUTPUT_DIR/$OUTPUT_BASENAME.o"
+            echo "Assembling $ASM_FILE -> $OUTPUT_FILE_ELF (ELF object)"
+            nasm -w-label-redef-late -f elf64 "$ASM_FILE" -o "$OUTPUT_FILE_ELF"
+            ;;
+    esac
+done
 
 if [ "$BUILD_PE" = "1" ]; then
-    while IFS= read -r ASM_FILE; do
-        BASENAME=$(basename "$ASM_FILE" _windows.asm)
-        LINUX_FILE="${ASM_FILE%_windows.asm}.asm"
-        
-        if [[ "$ASM_FILE" == *"_windows.asm" ]]; then
-            RELATIVE_PATH=${LINUX_FILE#"$ASM_DIR"/}
-            MODULE_STEM=${RELATIVE_PATH%.asm}
-            OUTPUT_BASENAME=$(echo "$MODULE_STEM" | tr '/' '_')
-            OUTPUT_FILE_PE="$OUTPUT_DIR/$OUTPUT_BASENAME.obj"
-            echo "Assembling $ASM_FILE -> $OUTPUT_FILE_PE (PE object)"
-            nasm -w-label-redef-late -f win64 "$ASM_FILE" -o "$OUTPUT_FILE_PE"
-        elif [[ ! -f "${ASM_FILE%.asm}_windows.asm" ]]; then
-            RELATIVE_PATH=${ASM_FILE#"$ASM_DIR"/}
-            MODULE_STEM=${RELATIVE_PATH%.asm}
-            OUTPUT_BASENAME=$(echo "$MODULE_STEM" | tr '/' '_')
-            OUTPUT_FILE_PE="$OUTPUT_DIR/$OUTPUT_BASENAME.obj"
-            echo "Assembling $ASM_FILE -> $OUTPUT_FILE_PE (PE object)"
-            nasm -w-label-redef-late -f win64 "$ASM_FILE" -o "$OUTPUT_FILE_PE"
-        fi
-    done < <(find "$ASM_DIR" -type f -name "*.asm")
+    find "$ASM_DIR" -type f -name "*.asm" | while IFS= read -r ASM_FILE; do
+        case "$ASM_FILE" in
+            *"_windows.asm")
+                LINUX_FILE="${ASM_FILE%_windows.asm}.asm"
+                RELATIVE_PATH=${LINUX_FILE#"$ASM_DIR"/}
+                MODULE_STEM=${RELATIVE_PATH%.asm}
+                OUTPUT_BASENAME=$(echo "$MODULE_STEM" | tr '/' '_')
+                OUTPUT_FILE_PE="$OUTPUT_DIR/$OUTPUT_BASENAME.obj"
+                echo "Assembling $ASM_FILE -> $OUTPUT_FILE_PE (PE object)"
+                nasm -w-label-redef-late -f win64 "$ASM_FILE" -o "$OUTPUT_FILE_PE"
+                ;;
+            *)
+                WINDOWS_VARIANT="${ASM_FILE%.asm}_windows.asm"
+                if [ ! -f "$WINDOWS_VARIANT" ]; then
+                    RELATIVE_PATH=${ASM_FILE#"$ASM_DIR"/}
+                    MODULE_STEM=${RELATIVE_PATH%.asm}
+                    OUTPUT_BASENAME=$(echo "$MODULE_STEM" | tr '/' '_')
+                    OUTPUT_FILE_PE="$OUTPUT_DIR/$OUTPUT_BASENAME.obj"
+                    echo "Assembling $ASM_FILE -> $OUTPUT_FILE_PE (PE object)"
+                    nasm -w-label-redef-late -f win64 "$ASM_FILE" -o "$OUTPUT_FILE_PE"
+                fi
+                ;;
+        esac
+    done
 fi
 
 LIBRARY_FILE="$OUTPUT_DIR/libruntime_helpers.a"
