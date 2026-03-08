@@ -36,8 +36,12 @@ jobs:
         run: |
           for example in examples/*; do
             if [ -d "$example" ]; then
-              echo "Running $example..."
-              sh "./examples/$(basename "$example")"
+              EXAMPLE_NAME=$(basename "$example")
+              BINARY="$example/build/x86_64-linux/$EXAMPLE_NAME"
+              if [ -f "$BINARY" ]; then
+                echo "Running $BINARY..."
+                "$BINARY"
+              fi
             fi
           done
   windows:
@@ -58,13 +62,16 @@ jobs:
           done
 
       - name: Run examples
+        shell: pwsh
         run: |
-          for example in examples/*; do
-            if [ -d "$example" ]; then
-              echo "Running $example..."
-              .\examples\$(basename "$example").exe
-            fi
-          done
+          foreach ($example in Get-ChildItem examples -Directory) {
+            $name = $example.Name
+            $binary = "$($example.FullName)\build\x86_64-windows\$name.exe"
+            if (Test-Path $binary) {
+              Write-Host "Running $binary..."
+              & $binary
+            }
+          }
   macos:
     runs-on: macos-latest
     steps:
@@ -89,8 +96,12 @@ jobs:
         run: |
           for example in examples/*; do
             if [ -d "$example" ]; then
-              echo "Running $example..."
-              sh "./examples/$(basename "$example")"
+              EXAMPLE_NAME=$(basename "$example")
+              BINARY="$example/build/x86_64-macos/$EXAMPLE_NAME"
+              if [ -f "$BINARY" ]; then
+                echo "Running $BINARY..."
+                "$BINARY"
+              fi
             fi
           done
   # TODO: add windows-arm and linux-arm jobs once those targets are supported
