@@ -92,7 +92,8 @@ if ($BuildPE -eq 1) {
     $PeEntryFile = Join-Path $OutputDir "main.obj"
     $PeObjFiles = @(Get-ChildItem -Path $OutputDir -Filter "*.obj" | Where-Object { $_.Name -ne "main.obj" })
     
-    & x86_64-w64-mingw32-gcc -o $FinalPeBinary $PeEntryFile @PeObjFiles -lkernel32 -lshell32 -nostdlib -Wl,--subsystem,console -Wl,--image-base,0x400000
+    $GccArgs = @("-o", $FinalPeBinary, $PeEntryFile) + @($PeObjFiles | ForEach-Object { $_.FullName }) + @("-lkernel32", "-lshell32", "-nostdlib", "-Wl,--subsystem,console", "-Wl,--image-base,0x400000")
+    & x86_64-w64-mingw32-gcc @GccArgs
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     
     Write-Host "Final Windows EXE created at $FinalPeBinary"
