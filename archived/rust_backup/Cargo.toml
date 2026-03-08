@@ -5,11 +5,6 @@ edition = "2024"
 description = "The Shiden Language"
 license = "MIT"
 repository = "https://github.com/idiotstudios/shiden"
-build = "build.rs"
-
-[features]
-default = ["auto-helpers"]
-auto-helpers = []
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
