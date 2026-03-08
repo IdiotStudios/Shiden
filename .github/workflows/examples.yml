@@ -49,6 +49,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install dependencies
+        run: |
+          choco install nasm -y
+          choco install mingw -y
+
       - name: Compile compiler
         run: .\compiler\compile.ps1
 
