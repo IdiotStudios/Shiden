@@ -15,7 +15,7 @@ section .data
     msg_build_done_len equ $ - msg_build_done
     msg_run_fail db "[error] Could not run built output", 0xA
     msg_run_fail_len equ $ - msg_run_fail
-    msg_no_linux db "[error] No linux target to run", 0xA
+    msg_no_linux db "[error] No runnable windows target in build.ini", 0xA
     msg_no_linux_len equ $ - msg_no_linux
     build_root db "build", 0
     build_prefix db "build/", 0
@@ -72,6 +72,9 @@ section .bss
     run_argv resq 2
     run_ready resq 1
     emit_code_size resq 1
+    write_count resd 1
+    startup_info resb 104
+    process_info resb 24
 
 section .text
     global build_compile
@@ -85,6 +88,12 @@ section .text
     extern codegen_get_code_size
     extern codegen_get_data
     extern codegen_get_data_size
+    extern CreateDirectoryA
+    extern CreateFileA
+    extern WriteFile
+    extern CloseHandle
+    extern CreateProcessA
+    extern WaitForSingleObject
 
 build_compile:
     push rbp
@@ -147,10 +156,8 @@ build_compile:
     mov rdx, msg_nl_len
     call rt_print
 
-    mov rax, 83
     lea rdi, [build_root]
-    mov rsi, 493
-    syscall
+    call win_mkdir
 
     xor rbx, rbx
 
@@ -274,10 +281,8 @@ build_compile:
 .finish_dir:
     mov byte [rdi], 0
 
-    mov rax, 83
     lea rdi, [path_dir]
-    mov rsi, 493
-    syscall
+    call win_mkdir
 
     lea rdi, [path_file]
     lea rsi, [path_dir]
@@ -345,11 +350,8 @@ build_compile:
 .finalize_path:
     mov byte [rdi], 0
 
-    mov rax, 2
     lea rdi, [path_file]
-    mov rsi, 577
-    mov rdx, 493
-    syscall
+    call win_open_create
     test rax, rax
     js .artifact_ret
 
@@ -383,16 +385,6 @@ build_compile:
     call .emit_code_dyn
     call .emit_data_dyn
 
-    lea rsi, [path_file]
-    lea rdi, [run_path]
-.copy_run_path:
-    mov al, byte [rsi]
-    mov byte [rdi], al
-    inc rsi
-    inc rdi
-    test al, al
-    jnz .copy_run_path
-    mov qword [run_ready], 1
     jmp .close_file
 
 .emit_elf_header_dyn:
@@ -422,11 +414,10 @@ build_compile:
     mov word [rsp+60], 0x0000
     mov word [rsp+62], 0x0000
     
-    mov rax, 1
     mov rdi, r8
     lea rsi, [rsp]
     mov rdx, 64
-    syscall
+    call win_write
     
     add rsp, 64
     ret
@@ -444,11 +435,10 @@ build_compile:
     mov qword [rsp+40], r9
     mov qword [rsp+48], 0x0000000000001000
 
-    mov rax, 1
     mov rdi, r8
     lea rsi, [rsp]
     mov rdx, 56
-    syscall
+    call win_write
 
     add rsp, 56
     ret
@@ -460,10 +450,9 @@ build_compile:
     
     call codegen_get_code
     mov rsi, rax
-    mov rax, 1
     mov rdi, r8
     mov rdx, r9
-    syscall
+    call win_write
 .ecd_ret:
     ret
 
@@ -483,35 +472,30 @@ build_compile:
     cmp byte [r12 + r14 + 4], 's'
     jne .emit_generic
 
-    mov rax, 1
     mov rdi, r8
     lea rsi, [sh_header]
     mov rdx, sh_header_len
-    syscall
+    call win_write
 
-    mov rax, 1
     mov rdi, r8
     lea rsi, [sh_echo_prefix]
     mov rdx, sh_echo_prefix_len
-    syscall
+    call win_write
 
-    mov rax, 1
     mov rdi, r8
     mov rsi, [project_ptr]
     mov rdx, [project_len]
-    syscall
+    call win_write
 
-    mov rax, 1
     mov rdi, r8
     lea rsi, [sh_mid_macos]
     mov rdx, sh_mid_macos_len
-    syscall
+    call win_write
 
-    mov rax, 1
     mov rdi, r8
     lea rsi, [sh_exit]
     mov rdx, sh_exit_len
-    syscall
+    call win_write
     jmp .close_file
 
 .emit_windows:
@@ -535,20 +519,19 @@ build_compile:
     
     call .emit_pe32_binary
 
-    lea rdi, [run_path]
     lea rsi, [path_file]
-.copy_run_path_windows:
+    lea rdi, [run_path]
+.copy_run_path_win:
     mov al, byte [rsi]
     mov byte [rdi], al
     inc rsi
     inc rdi
     test al, al
-    jnz .copy_run_path_windows
+    jnz .copy_run_path_win
     mov qword [run_ready], 1
     jmp .close_file
 
 .emit_pe32_binary:
-    push rbx
     push r12
     push r13
     push r14
@@ -571,11 +554,10 @@ build_compile:
     mov byte [r14 + 3], 0x00
     mov dword [r14 + 0x3C], 64
     
-    mov rax, 1
     mov rdi, r12
     mov rsi, r14
     mov rdx, 64
-    syscall
+    call win_write
     
     lea r14, [rsp]
     mov rcx, 264
@@ -645,11 +627,10 @@ build_compile:
     mov dword [r14 + 128], 0x00001000
     mov dword [r14 + 132], 16
     
-    mov rax, 1
     mov rdi, r12
     mov rsi, r14
     mov rdx, 264
-    syscall
+    call win_write
     
     lea r14, [rsp]
     mov rcx, 40
@@ -681,11 +662,10 @@ build_compile:
     mov word [r14 + 34], 0
     mov dword [r14 + 36], 0x60000020
     
-    mov rax, 1
     mov rdi, r12
     mov rsi, r14
     mov rdx, 40
-    syscall
+    call win_write
     
     lea r14, [rsp]
     mov rcx, 144
@@ -695,18 +675,16 @@ build_compile:
     dec rcx
     jnz .epb_clear4
     
-    mov rax, 1
     mov rdi, r12
     mov rsi, r14
     mov rdx, 144
-    syscall
+    call win_write
     
     call codegen_get_code
     mov rsi, rax
-    mov rax, 1
     mov rdi, r12
     mov rdx, r13
-    syscall
+    call win_write
     
     mov rax, r13
     add rax, 511
@@ -715,9 +693,8 @@ build_compile:
     test rax, rax
     jz .epb_no_pad
     
-    mov rbx, rax
     lea r14, [rsp]
-    mov rcx, rbx
+    mov rcx, rax
     cmp rcx, 512
     jle .epb_pad_ok
     mov rcx, 512
@@ -728,39 +705,32 @@ build_compile:
     dec rcx
     jnz .epb_clear_pad
     
-    mov rax, 1
     mov rdi, r12
     mov rsi, r14
-    mov rdx, rbx
-    syscall
+    mov rdx, rax
+    call win_write
     
 .epb_no_pad:
     add rsp, 512
     pop r14
     pop r13
     pop r12
-    pop rbx
     ret
-    jmp .close_file
 
 .emit_generic:
-    mov rax, 1
     mov rdi, r8
     lea rsi, [sh_header]
     mov rdx, sh_header_len
-    syscall
+    call win_write
 
-    mov rax, 1
     mov rdi, r8
     lea rsi, [sh_exit]
     mov rdx, sh_exit_len
-    syscall
+    call win_write
 
 .close_file:
-
-    mov rax, 3
     mov rdi, r8
-    syscall
+    call win_close
 
 .artifact_ret:
     pop r8
@@ -775,15 +745,10 @@ build_run:
     cmp qword [run_ready], 1
     jne .run_no_linux
 
-    lea rax, [run_path]
-    mov [run_argv], rax
-    mov qword [run_argv + 8], 0
-
-    mov rax, 59
     lea rdi, [run_path]
-    lea rsi, [run_argv]
-    xor rdx, rdx
-    syscall
+    call win_exec_wait
+    test rax, rax
+    jz .run_ok
 
     lea rsi, [msg_run_fail]
     mov rdx, msg_run_fail_len
@@ -791,9 +756,141 @@ build_run:
     mov rax, -1
     ret
 
+.run_ok:
+    xor rax, rax
+    ret
+
 .run_no_linux:
     lea rsi, [msg_no_linux]
     mov rdx, msg_no_linux_len
     call rt_print
     mov rax, -1
+    ret
+
+win_mkdir:
+    push r14
+    mov r14, rsp
+    and rsp, -16
+    sub rsp, 48
+    mov rcx, rdi
+    xor rdx, rdx
+    call CreateDirectoryA
+    mov rsp, r14
+    pop r14
+    ret
+
+win_open_create:
+    push r14
+    mov r14, rsp
+    and rsp, -16
+    sub rsp, 64
+    mov rcx, rdi
+    mov rdx, 0x40000000
+    xor r8, r8
+    xor r9, r9
+    mov qword [rsp + 32], 2
+    mov qword [rsp + 40], 0x80
+    mov qword [rsp + 48], 0
+    call CreateFileA
+    cmp rax, -1
+    je .woc_fail
+    mov rsp, r14
+    pop r14
+    ret
+.woc_fail:
+    mov rax, -1
+    mov rsp, r14
+    pop r14
+    ret
+
+win_write:
+    push r14
+    mov r14, rsp
+    and rsp, -16
+    sub rsp, 48
+    mov rcx, rdi
+    mov r8, rdx
+    mov rdx, rsi
+    lea r9, [write_count]
+    mov dword [write_count], 0
+    mov qword [rsp + 32], 0
+    call WriteFile
+    mov rsp, r14
+    pop r14
+    ret
+
+win_close:
+    push r14
+    mov r14, rsp
+    and rsp, -16
+    sub rsp, 48
+    mov rcx, rdi
+    call CloseHandle
+    mov rsp, r14
+    pop r14
+    ret
+
+win_exec_wait:
+    push rbx
+    push r14
+    mov rbx, rdi
+    mov r14, rsp
+    and rsp, -16
+
+    lea rdi, [startup_info]
+    mov rcx, 104
+    xor rax, rax
+.wes_zero_start:
+    mov byte [rdi], 0
+    inc rdi
+    dec rcx
+    jnz .wes_zero_start
+
+    lea rdi, [process_info]
+    mov rcx, 24
+.wes_zero_proc:
+    mov byte [rdi], 0
+    inc rdi
+    dec rcx
+    jnz .wes_zero_proc
+
+    mov dword [startup_info], 104
+
+    sub rsp, 96
+    xor rcx, rcx
+    mov rdx, rbx
+    xor r8, r8
+    xor r9, r9
+    mov qword [rsp + 32], 0
+    mov qword [rsp + 40], 0
+    mov qword [rsp + 48], 0
+    mov qword [rsp + 56], 0
+    lea rax, [startup_info]
+    mov qword [rsp + 64], rax
+    lea rax, [process_info]
+    mov qword [rsp + 72], rax
+    call CreateProcessA
+    test rax, rax
+    jz .wes_fail
+
+    mov rcx, [process_info]
+    mov rdx, -1
+    call WaitForSingleObject
+
+    mov rcx, [process_info]
+    call CloseHandle
+    mov rcx, [process_info + 8]
+    call CloseHandle
+
+    mov rsp, r14
+    xor rax, rax
+    pop r14
+    pop rbx
+    ret
+
+.wes_fail:
+    mov rsp, r14
+    mov rax, -1
+    pop r14
+    pop rbx
     ret
