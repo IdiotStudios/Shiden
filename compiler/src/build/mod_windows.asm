@@ -22,6 +22,7 @@ section .data
     slash_str db "/", 0
     ext_exe db ".exe", 0
     default_name db "app", 0
+    cmd_rmdir db "cmd.exe /c rmdir /s /q build 2>nul", 0
     elf64_stub:
         db 0x7F, "ELF", 0x02, 0x01, 0x01, 0x00
         db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
@@ -157,6 +158,7 @@ build_compile:
     call rt_print
 
     lea rdi, [build_root]
+    call win_rmdir_recursive
     call win_mkdir
 
     xor rbx, rbx
@@ -777,6 +779,64 @@ win_mkdir:
     call CreateDirectoryA
     mov rsp, r14
     pop r14
+    ret
+
+win_rmdir_recursive:
+    push rbx
+    push r14
+    mov r14, rsp
+    and rsp, -16
+
+    lea rdi, [startup_info]
+    mov rcx, 104
+    xor rax, rax
+.zero_start:
+    mov byte [rdi], 0
+    inc rdi
+    dec rcx
+    jnz .zero_start
+
+    lea rdi, [process_info]
+    mov rcx, 24
+.zero_proc:
+    mov byte [rdi], 0
+    inc rdi
+    dec rcx
+    jnz .zero_proc
+
+    mov dword [startup_info], 104
+
+    sub rsp, 96
+    xor rcx, rcx
+    lea rdx, [cmd_rmdir]
+    xor r8, r8
+    xor r9, r9
+    mov qword [rsp + 32], 0
+    mov qword [rsp + 40], 0
+    mov qword [rsp + 48], 0
+    mov qword [rsp + 56], 0
+    lea rax, [startup_info]
+    mov qword [rsp + 64], rax
+    lea rax, [process_info]
+    mov qword [rsp + 72], rax
+    call CreateProcessA
+
+    test rax, rax
+    jz .rmdir_done
+
+    mov rcx, qword [process_info]
+    mov rdx, -1
+    call WaitForSingleObject
+
+    mov rcx, qword [process_info]
+    call CloseHandle
+    mov rcx, qword [process_info + 8]
+    call CloseHandle
+
+.rmdir_done:
+    mov rsp, r14
+    pop r14
+    pop rbx
     ret
 
 win_open_create:

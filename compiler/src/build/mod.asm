@@ -22,6 +22,10 @@ section .data
     slash_str db "/", 0
     ext_exe db ".exe", 0
     default_name db "app", 0
+    rm_cmd db "/bin/rm", 0
+    rm_arg_flag db "-rf", 0
+    rm_arg_build db "build", 0
+    rm_argv dq 0, 0, 0, 0
     elf64_stub:
         db 0x7F, "ELF", 0x02, 0x01, 0x01, 0x00
         db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
@@ -146,6 +150,8 @@ build_compile:
     lea rsi, [msg_nl]
     mov rdx, msg_nl_len
     call rt_print
+
+    call rmdir_recursive
 
     mov rax, 83
     lea rdi, [build_root]
@@ -796,4 +802,45 @@ build_run:
     mov rdx, msg_no_linux_len
     call rt_print
     mov rax, -1
+    ret
+
+rmdir_recursive:
+    push rbx
+    push r12
+
+    lea rax, [rm_cmd]
+    mov [rm_argv], rax
+    lea rax, [rm_arg_flag]
+    mov [rm_argv + 8], rax
+    lea rax, [rm_arg_build]
+    mov [rm_argv + 16], rax
+    mov qword [rm_argv + 24], 0
+
+    mov rax, 57
+    syscall
+    test rax, rax
+    jnz .parent
+
+    mov rax, 59
+    lea rdi, [rm_cmd]
+    lea rsi, [rm_argv]
+    xor rdx, rdx
+    syscall
+
+    mov rax, 60
+    xor rdi, rdi
+    syscall
+
+.parent:
+    mov r12, rax
+
+    mov rax, 61
+    mov rdi, r12
+    xor rsi, rsi
+    xor rdx, rdx
+    xor r10, r10
+    syscall
+
+    pop r12
+    pop rbx
     ret
