@@ -58,13 +58,12 @@ jobs:
         run: .\compiler\compile.ps1
 
       - name: Build examples
+        shell: pwsh
         run: |
-          for example in examples/*; do
-            if [ -d "$example" ]; then
-              echo "Building $example..."
-              .\compiler\asm_output\shiden.exe compile "$example"
-            fi
-          done
+          foreach ($example in Get-ChildItem examples -Directory) {
+            Write-Host "Building $($example.Name)..."
+            & .\compiler\asm_output\shiden.exe compile $example.FullName
+          }
 
       - name: Run examples
         shell: pwsh
