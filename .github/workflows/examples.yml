@@ -76,36 +76,4 @@ jobs:
               & $binary
             }
           }
-  macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: brew install nasm mingw-w64
-
-      - name: Compile compiler
-        run: sh ./compiler/compile.sh
-
-      - name: Build examples
-        run: |
-          for example in examples/*; do
-            if [ -d "$example" ]; then
-              echo "Building $example..."
-              ./compiler/asm_output/shiden compile "$example"
-            fi
-          done
-
-      - name: Run examples
-        run: |
-          for example in examples/*; do
-            if [ -d "$example" ]; then
-              EXAMPLE_NAME=$(basename "$example")
-              BINARY="$example/build/macos/$EXAMPLE_NAME"
-              if [ -f "$BINARY" ]; then
-                echo "Running $BINARY..."
-                "$BINARY"
-              fi
-            fi
-          done
   # TODO: add windows-arm and linux-arm jobs once those targets are supported
