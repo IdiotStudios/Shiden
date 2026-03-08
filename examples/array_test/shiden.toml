@@ -1,5 +1,0 @@
-[build]
-name = "array_test"
-mode = "release"
-target = "x86_64-linux"
-output = "array_test"
