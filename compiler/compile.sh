@@ -71,11 +71,11 @@ ELF_OBJ_FILES=$(find "$OUTPUT_DIR" -type f -name "*.o" ! -name "main.o")
 
 # Detect OS and set flags
 if [ "$(uname)" = "Darwin" ]; then
-    # macOS requires -arch flag (because archlinux is better)
+    # macOS requires platform_version and arch (because archlinux is better)
     ARCH=$(uname -m)
-    ld -arch "$ARCH" -o "$FINAL_ELF_BINARY" "$ELF_ENTRY_FILE" $ELF_OBJ_FILES
+    ld -arch "$ARCH" -platform_version macos 10.15 10.15 -o "$FINAL_ELF_BINARY" "$ELF_ENTRY_FILE" $ELF_OBJ_FILES
 else
-    # Linux uses nomral ld
+    # Linux uses normal ld
     ld -o "$FINAL_ELF_BINARY" "$ELF_ENTRY_FILE" $ELF_OBJ_FILES
 fi
 
