@@ -28,7 +28,7 @@ rt_write:
 
     mov r14, rsp
     and rsp, -16
-    sub rsp, 56
+    sub rsp, 64
 
     mov rcx, rdi
     call GetStdHandle

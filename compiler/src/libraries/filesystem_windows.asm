@@ -6,6 +6,7 @@ section .data
 
 section .bss
     fs_read_buffer resb 131072
+    fs_bytes_read resd 1
 
 section .text
     global filesystem_init
@@ -28,7 +29,7 @@ filesystem_read_file:
     push r14
     mov r14, rsp
     and rsp, -16
-    sub rsp, 48
+    sub rsp, 64
     
     mov r12, rdi
     
@@ -38,6 +39,7 @@ filesystem_read_file:
     xor r9, r9
     mov qword [rsp + 32], 3
     mov qword [rsp + 40], 0
+    mov qword [rsp + 48], 0
     call CreateFileA
     
     cmp rax, -1
@@ -48,16 +50,16 @@ filesystem_read_file:
     mov rcx, r13
     lea rdx, [rel fs_read_buffer]
     mov r8, 131071
-    lea r9, [rsp + 40]
-    mov qword [rsp + 40], 0
+    lea r9, [rel fs_bytes_read]
+    mov dword [rel fs_bytes_read], 0
     mov qword [rsp + 32], 0
     call ReadFile
     
     test rax, rax
     jz .close_fail
     
-    mov r9, qword [rsp + 40]
-    test r9, r9
+    mov r9d, dword [rel fs_bytes_read]
+    test r9d, r9d
     jz .close_fail
     
     lea r10, [rel fs_read_buffer]
