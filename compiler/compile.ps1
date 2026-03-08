@@ -1,27 +1,92 @@
-$RootDir = (Get-Item -Path "." -Verbose).FullName + "\compiler"
-$AsmDir = "$RootDir\libraries\runtime\linux"
-$OutputDir = "$RootDir\target\asm_output"
+$RootDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$AsmDir = Join-Path $RootDir "src"
+$OutputDir = Join-Path $RootDir "asm_output"
+$BuildPE = if ($env:BUILD_PE) { $env:BUILD_PE } else { 1 }
 
-if (-Not (Test-Path -Path $OutputDir)) {
-    New-Item -ItemType Directory -Path $OutputDir
+# Clean and create directories
+if (Test-Path $OutputDir) {
+    Remove-Item -Path $OutputDir -Recurse -Force
+}
+New-Item -ItemType Directory -Path $OutputDir | Out-Null
+New-Item -ItemType Directory -Path $AsmDir | Out-Null
+
+# Check for assembly files
+$AsmFiles = @(Get-ChildItem -Path $AsmDir -Recurse -Filter "*.asm" -ErrorAction SilentlyContinue)
+if ($AsmFiles.Count -eq 0) {
+    Write-Host "No assembly files found in $AsmDir. Exiting."
+    exit 1
 }
 
-Get-ChildItem -Path $AsmDir -Recurse -Filter "*.asm" | ForEach-Object {
-    $BaseName = $_.BaseName
+# Compile ELF objects (skip _windows.asm files)
+$AsmFiles | Where-Object { $_.Name -notlike "*_windows.asm" } | ForEach-Object {
+    $RelativePath = $_.FullName.Substring($AsmDir.Length).TrimStart('\', '/')
+    $ModuleStem = $RelativePath -replace '\.asm$', ''
+    $OutputBasename = $ModuleStem -replace '\\', '_'
+    $OutputFile = Join-Path $OutputDir "$OutputBasename.o"
 
-    # Compile to ELF binary
-    $ElfOutputFile = "$OutputDir\$BaseName"
-    Write-Host "Compiling $($_.FullName) -> $ElfOutputFile (ELF Binary)"
-    nasm -f elf64 $_.FullName -o $ElfOutputFile
-
-    # Compile to Windows executable (PE)
-    $PeOutputFile = "$OutputDir\$BaseName.exe"
-    Write-Host "Compiling $($_.FullName) -> $PeOutputFile (Windows EXE)"
-    nasm -f win64 $_.FullName -o $PeOutputFile
+    Write-Host "Assembling $($_.FullName) -> $OutputFile (ELF object)"
+    & nasm -w-label-redef-late -f elf64 $_.FullName -o $OutputFile
 }
 
-$LibraryFile = "$OutputDir\libruntime_helpers.a"
+# Compile PE objects if enabled
+if ($BuildPE -eq 1) {
+    $AsmFiles | ForEach-Object {
+        $FileName = $_.Name
+        $FilePath = $_.FullName
+        
+        if ($FileName -like "*_windows.asm") {
+            # This is a Windows-specific file
+            $LinuxFile = $FilePath -replace '_windows\.asm$', '.asm'
+            $RelativePath = $LinuxFile.Substring($AsmDir.Length).TrimStart('\', '/')
+            $ModuleStem = $RelativePath -replace '\.asm$', ''
+            $OutputBasename = $ModuleStem -replace '\\', '_'
+            $OutputFile = Join-Path $OutputDir "$OutputBasename.obj"
+            
+            Write-Host "Assembling $FilePath -> $OutputFile (PE object)"
+            & nasm -w-label-redef-late -f win64 $FilePath -o $OutputFile
+        } else {
+            # Check if Windows variant exists
+            $WindowsVariant = $FilePath -replace '\.asm$', '_windows.asm'
+            if (-Not (Test-Path $WindowsVariant)) {
+                # No Windows variant, compile this as PE too
+                $RelativePath = $FilePath.Substring($AsmDir.Length).TrimStart('\', '/')
+                $ModuleStem = $RelativePath -replace '\.asm$', ''
+                $OutputBasename = $ModuleStem -replace '\\', '_'
+                $OutputFile = Join-Path $OutputDir "$OutputBasename.obj"
+                
+                Write-Host "Assembling $FilePath -> $OutputFile (PE object)"
+                & nasm -w-label-redef-late -f win64 $FilePath -o $OutputFile
+            }
+        }
+    }
+}
+
+# Create static library from ELF objects
+$LibraryFile = Join-Path $OutputDir "libruntime_helpers.a"
 Write-Host "Creating static library: $LibraryFile"
-& ar crus $LibraryFile (Get-ChildItem -Path $OutputDir -Filter "*.o").FullName
+$OFiles = @(Get-ChildItem -Path $OutputDir -Filter "*.o" -ErrorAction SilentlyContinue)
+if ($OFiles.Count -gt 0) {
+    & ar crs $LibraryFile @OFiles
+}
+
+$FinalElfBinary = Join-Path $OutputDir "shiden"
+$FinalPeBinary = Join-Path $OutputDir "shiden.exe"
+
+# Link ELF binary
+$ElfEntryFile = Join-Path $OutputDir "main.o"
+$ElfObjFiles = @(Get-ChildItem -Path $OutputDir -Filter "*.o" | Where-Object { $_.Name -ne "main.o" })
+
+& ld -o $FinalElfBinary $ElfEntryFile @ElfObjFiles
+
+Write-Host "Final ELF binary created at $FinalElfBinary"
+
+# Link PE binary if enabled
+if ($BuildPE -eq 1) {
+    $PeEntryFile = Join-Path $OutputDir "main.obj"
+    $PeObjFiles = @(Get-ChildItem -Path $OutputDir -Filter "*.obj" | Where-Object { $_.Name -ne "main.obj" })
+    
+    & x86_64-w64-mingw32-gcc -o $FinalPeBinary $PeEntryFile @PeObjFiles -lkernel32 -lshell32 -nostdlib -Wl,--subsystem,console -Wl,--image-base,0x400000
+    Write-Host "Final Windows EXE created at $FinalPeBinary"
+}
 
 Write-Host "Compilation complete. Static library created at $LibraryFile"
