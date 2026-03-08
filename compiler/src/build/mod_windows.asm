@@ -786,7 +786,7 @@ win_open_create:
     sub rsp, 64
     mov rcx, rdi
     mov rdx, 0x40000000
-    xor r8, r8
+    mov r8, 3
     xor r9, r9
     mov qword [rsp + 32], 2
     mov qword [rsp + 40], 0x80

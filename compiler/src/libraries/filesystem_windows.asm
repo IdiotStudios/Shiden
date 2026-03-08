@@ -34,7 +34,7 @@ filesystem_read_file:
     
     mov rcx, r12
     mov rdx, 0x80000000
-    xor r8, r8
+    mov r8, 3
     xor r9, r9
     mov qword [rsp + 32], 3
     mov qword [rsp + 40], 0
