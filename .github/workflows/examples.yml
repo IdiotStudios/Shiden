@@ -14,6 +14,8 @@ concurrency:
 jobs:
   linux:
     runs-on: ubuntu-latest
+    # Disable well fixing windows to save on minutes
+    if: false
     steps:
       - uses: actions/checkout@v4
 
