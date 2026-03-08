@@ -36,8 +36,8 @@ rt_write:
     mov rcx, rax
     mov rdx, r12
     mov r8, rbx
-    lea r9, [rsp + 24]
-    mov dword [rsp + 24], 0
+    lea r9, [rsp + 40]
+    mov qword [rsp + 40], 0
     mov qword [rsp + 32], 0
     call WriteFile
 

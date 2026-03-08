@@ -46,17 +46,17 @@ filesystem_read_file:
     mov r13, rax
     
     mov rcx, r13
-    lea rdx, [fs_read_buffer]
+    lea rdx, [rel fs_read_buffer]
     mov r8, 131071
-    lea r9, [rsp + 8]
-    mov qword [rsp + 8], 0
+    lea r9, [rsp + 40]
+    mov qword [rsp + 40], 0
     mov qword [rsp + 32], 0
     call ReadFile
     
     test rax, rax
     jz .close_fail
     
-    mov r9, qword [rsp + 8]
+    mov r9, qword [rsp + 40]
     test r9, r9
     jz .close_fail
     
