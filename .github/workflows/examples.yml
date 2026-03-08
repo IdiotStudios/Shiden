@@ -25,12 +25,20 @@ jobs:
 
       - name: Build examples
         run: |
+          failed=""
           for example in examples/*; do
             if [ -d "$example" ]; then
               echo "Building $example..."
-              ./compiler/asm_output/shiden compile "$example"
+              if ! ./compiler/asm_output/shiden compile "$example"; then
+                echo "Failed to build $example"
+                failed="$failed $(basename "$example")"
+              fi
             fi
           done
+          if [ -n "$failed" ]; then
+            echo "Failed examples:$failed"
+            exit 1
+          fi
 
       - name: Run examples
         run: |
@@ -60,9 +68,18 @@ jobs:
       - name: Build examples
         shell: pwsh
         run: |
+          $failed = @()
           foreach ($example in Get-ChildItem examples -Directory) {
             Write-Host "Building $($example.Name)..."
             & .\compiler\asm_output\shiden.exe compile $example.FullName
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "Failed to build $($example.Name)" -ForegroundColor Red
+              $failed += $example.Name
+            }
+          }
+          if ($failed.Count -gt 0) {
+            Write-Host "Failed examples: $($failed -join ', ')" -ForegroundColor Red
+            exit 1
           }
 
       - name: Run examples
