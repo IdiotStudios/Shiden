@@ -31,7 +31,7 @@ $AsmFiles | Where-Object { $_.Name -notlike "*_windows.asm" } | ForEach-Object {
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
-# Compile PE objects if enabled
+# Compile PE objects
 if ($BuildPE -eq 1) {
     $AsmFiles | ForEach-Object {
         $FileName = $_.Name
@@ -72,20 +72,39 @@ Write-Host "Creating static library: $LibraryFile"
 $OFiles = @(Get-ChildItem -Path $OutputDir -Filter "*.o" -ErrorAction SilentlyContinue)
 if ($OFiles.Count -gt 0) {
     & ar crs $LibraryFile @OFiles
-    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    if ($LASTEXITCODE -ne 0) { 
+        Write-Host "Warning: ar command failed. Static library creation skipped."
+    }
 }
 
 $FinalElfBinary = Join-Path $OutputDir "shiden"
 $FinalPeBinary = Join-Path $OutputDir "shiden.exe"
 
-# Link ELF binary
+# Link ELF binary using mingw-w64 linker
 $ElfEntryFile = Join-Path $OutputDir "main.o"
 $ElfObjFiles = @(Get-ChildItem -Path $OutputDir -Filter "*.o" | Where-Object { $_.Name -ne "main.o" })
 
-& ld -o $FinalElfBinary $ElfEntryFile @ElfObjFiles
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-Write-Host "Final ELF binary created at $FinalElfBinary"
+if ((Test-Path $ElfEntryFile) -and ($ElfObjFiles.Count -gt 0)) {
+    $LdCommand = $null
+    if (Get-Command x86_64-w64-mingw32-ld -ErrorAction SilentlyContinue) {
+        $LdCommand = "x86_64-w64-mingw32-ld"
+    } elseif (Get-Command ld -ErrorAction SilentlyContinue) {
+        $LdCommand = "ld"
+    }
+    
+    if ($LdCommand) {
+        & $LdCommand -o $FinalElfBinary $ElfEntryFile @ElfObjFiles
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "Final ELF binary created at $FinalElfBinary"
+        } else {
+            Write-Host "Warning: ELF linking failed."
+            exit 1
+        }
+    } else {
+        Write-Host "Error: No linker found (ld or x86_64-w64-mingw32-ld). Install mingw-w64."
+        exit 1
+    }
+}
 
 # Link PE binary if enabled
 if ($BuildPE -eq 1) {
@@ -94,13 +113,18 @@ if ($BuildPE -eq 1) {
     
     $GccPath = Get-Command x86_64-w64-mingw32-gcc -ErrorAction SilentlyContinue
     if ($GccPath) {
-        $GccArgs = @("-o", $FinalPeBinary, $PeEntryFile) + @($PeObjFiles | ForEach-Object { $_.FullName }) + @("-lkernel32", "-lshell32", "-nostdlib", "-Wl,--subsystem,console", "-Wl,--image-base,0x400000")
-        & x86_64-w64-mingw32-gcc @GccArgs
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        Write-Host "Final Windows EXE created at $FinalPeBinary"
+        if ((Test-Path $PeEntryFile) -and ($PeObjFiles.Count -gt 0)) {
+            $GccArgs = @("-o", $FinalPeBinary, $PeEntryFile) + @($PeObjFiles | ForEach-Object { $_.FullName }) + @("-lkernel32", "-lshell32", "-nostdlib", "-Wl,--subsystem,console", "-Wl,--image-base,0x400000")
+            & x86_64-w64-mingw32-gcc @GccArgs
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            Write-Host "Final Windows EXE created at $FinalPeBinary"
+        } else {
+            Write-Host "Error: main.obj not found or no PE objects available."
+            exit 1
+        }
     } else {
-        Write-Host "Warning: x86_64-w64-mingw32-gcc not found. PE linking skipped. Install mingw-w64 or Visual Studio to build Windows executables."
+        Write-Host "Warning: x86_64-w64-mingw32-gcc not found. PE linking skipped. Install mingw-w64 to build Windows executables."
     }
 }
 
-Write-Host "Compilation complete. Static library created at $LibraryFile"
+Write-Host "Compilation complete."
