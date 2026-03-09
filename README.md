@@ -87,6 +87,10 @@ my_project/
 └── README.md  
 ```
 
+## Supporters
+
+Shiden is a project supported by [GitBook](https://www.gitbook.com/)! If you want to support the project then consider sponsoring or donating! It really helps a lot and is very much appreciated.
+
 ## Contributing
 
 If you do wanna contribute then feel free to create issues or pull requests! Love the support.
