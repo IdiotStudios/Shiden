@@ -89,7 +89,7 @@ my_project/
 
 ## Supporters
 
-Shiden is a project supported by [GitBook](https://www.gitbook.com/)! If you want to support the project then consider sponsoring or donating! It really helps a lot and is very much appreciated.
+Shiden is a project supported by [GitBook](https://www.gitbook.com/?utm_source=content&utm_medium=sponsored-by-gitbook&utm_campaign=xaAHE1MNwN8fiIAs9Mux)! If you want to support the project then consider sponsoring or donating! It really helps a lot and is very much appreciated.
 
 ## Contributing
 
