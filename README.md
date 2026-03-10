@@ -55,7 +55,7 @@ GitHub should add polls to repos. That would be peak.
 
 - 🧠 **[VSCode-Extension](https://marketplace.visualstudio.com/items?itemName=IdiotStudios.shiden)**  
 - 🍽️ **[Flavortown-Project](https://flavortown.hackclub.com/projects/10866)**  
-- 📚 **[Shiden-Docs](https://shiden.arson.dev/docs)**  
+- 📚 **[Shiden-Docs](https://docs.shiden.kirze.de/)**  
 - 📦 **[Shiden-Package-Registry]()** (hint...)  
 - 🧪 **[Benchmarks]()** (hmm very soon)  
 (thanks kde emoji picker)
