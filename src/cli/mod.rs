@@ -321,6 +321,32 @@ fn read_source(path: &Option<String>) -> io::Result<String> {
     }
 }
 
+fn has_manifest_in(dir: &std::path::Path) -> bool {
+    dir.join("shiden.toml").exists()
+}
+
+fn default_run_file_for(file: &Option<String>, cwd: &std::path::Path) -> Option<String> {
+    if file.is_some() {
+        return file.clone();
+    }
+    if has_manifest_in(cwd) {
+        Some(".".to_string())
+    } else {
+        None
+    }
+}
+
+fn default_check_file_for(file: &Option<String>, cwd: &std::path::Path) -> Option<String> {
+    if file.is_some() {
+        return file.clone();
+    }
+    if has_manifest_in(cwd) {
+        Some("src/main.sd".to_string())
+    } else {
+        None
+    }
+}
+
 pub fn run() {
     let cli = Cli::parse();
 
@@ -341,9 +367,12 @@ pub fn run() {
                 std::process::exit(2);
             }
         },
-        Some(Commands::Run { file, out }) => match file {
+        Some(Commands::Run { file, out }) => {
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let run_file = default_run_file_for(file, &cwd);
+            match run_file {
             Some(p) => {
-                let path = std::path::Path::new(p);
+                let path = std::path::Path::new(&p);
                 if path.is_dir() {
                     let manifest = path.join("shiden.toml");
                     if !manifest.exists() {
@@ -488,9 +517,13 @@ pub fn run() {
                     std::process::exit(2);
                 }
             },
-        },
+            }
+        }
 
-        Some(Commands::Check { file, format }) => match read_source(file) {
+        Some(Commands::Check { file, format }) => {
+            let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+            let check_file = default_check_file_for(file, &cwd);
+            match read_source(&check_file) {
             Ok(src) => {
                 let want_json = matches!(format.as_deref(), Some("json"));
                 match crate::frontend::parse(&src) {
@@ -504,7 +537,7 @@ pub fn run() {
                             }
                         } else {
                             if want_json {
-                                let file_path = file.clone().unwrap_or_else(|| "".into());
+                                let file_path = check_file.clone().unwrap_or_else(|| "".into());
                                 let msg = "missing 'main' function";
                                 println!(
                                     "{{\"diagnostics\":[{{\"file\":\"{}\",\"line\":1,\"col\":1,\"severity\":\"error\",\"message\":\"{}\"}}]}}",
@@ -519,7 +552,7 @@ pub fn run() {
                     }
                     Err(e) => {
                         if want_json {
-                            let file_path = file.clone().unwrap_or_else(|| "".into());
+                            let file_path = check_file.clone().unwrap_or_else(|| "".into());
                             let (msg, loc) = split_error_loc(&e);
                             let (line, col) = loc.unwrap_or((1, 1));
                             println!(
@@ -530,7 +563,7 @@ pub fn run() {
                                 escape_json(&msg)
                             );
                         } else {
-                            let label = file.clone().unwrap_or_else(|| "<stdin>".into());
+                            let label = check_file.clone().unwrap_or_else(|| "<stdin>".into());
                             eprintln!("Parse error: {}", format_parse_error(&label, &e));
                         }
                         std::process::exit(2);
@@ -539,7 +572,7 @@ pub fn run() {
             }
             Err(e) => {
                 if matches!(format.as_deref(), Some("json")) {
-                    let file_path = file.clone().unwrap_or_else(|| "".into());
+                    let file_path = check_file.clone().unwrap_or_else(|| "".into());
                     println!(
                         "{{\"diagnostics\":[{{\"file\":\"{}\",\"line\":1,\"col\":1,\"severity\":\"error\",\"message\":\"{}\"}}]}}",
                         file_path,
@@ -550,7 +583,8 @@ pub fn run() {
                 }
                 std::process::exit(2);
             }
-        },
+            }
+        }
 
         Some(Commands::New { name }) => {
             match create_project_in(std::env::current_dir().expect("cwd"), name) {
@@ -855,6 +889,22 @@ mod tests {
             Commands::Compile { manifest } => assert!(manifest.is_none()),
             _ => panic!("expected compile subcommand"),
         }
+    }
+
+    #[test]
+    fn default_run_file_uses_cwd_project() {
+        let td = tempfile::tempdir().expect("tempdir");
+        std::fs::write(td.path().join("shiden.toml"), "[project]\nname=\"x\"").expect("write");
+        let got = default_run_file_for(&None, td.path());
+        assert_eq!(got, Some(".".to_string()));
+    }
+
+    #[test]
+    fn default_check_file_uses_cwd_project_entry() {
+        let td = tempfile::tempdir().expect("tempdir");
+        std::fs::write(td.path().join("shiden.toml"), "[project]\nname=\"x\"").expect("write");
+        let got = default_check_file_for(&None, td.path());
+        assert_eq!(got, Some("src/main.sd".to_string()));
     }
 
     #[test]
