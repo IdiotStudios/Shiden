@@ -700,7 +700,7 @@ fn create_project_in(base: std::path::PathBuf, name: &str) -> Result<(), String>
     }
     std::fs::create_dir_all(dir.join("src")).map_err(|e| e.to_string())?;
 
-    let main_sd = "fn new main/\n    println(\"Hello world\")/unit\nfn/";
+    let main_sd = "fn new main/\n    println(\"Hello world\")/\nfn/";
     std::fs::write(dir.join("src/main.sd"), main_sd).map_err(|e| e.to_string())?;
 
     let manifest = format!(

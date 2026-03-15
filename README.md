@@ -60,7 +60,16 @@ GitHub should add polls to repos. That would be peak.
 - 🧪 **[Benchmarks]()** (hmm very soon)  
 (thanks kde emoji picker)
 
-## CLI
+## Cli - Rust version
+| Command | Description | Status |
+| :--- | :--- | :---: |
+| `shiden run` | release mode by default, add `--debug` for debug mode | ✅ |
+| `shiden check` | runs checks | ✅ |
+| `shiden new {name}` | creates a new project | ✅ |
+| `shiden compile` | compiles Shiden (run does the same anyway) | ✅ |
+| `shiden help` | shows help | ✅ |
+
+## CLI - Assembly version
 | Command | Description | Status |
 | :--- | :--- | :---: |
 | `shiden run` | release mode by default, add `--debug` for debug mode | ✅ |
