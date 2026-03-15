@@ -5,3 +5,6 @@
 !.github/funding.yml
 !.github/workflows/
 !.github/rust_workflows/
+
+# temp
+target/
