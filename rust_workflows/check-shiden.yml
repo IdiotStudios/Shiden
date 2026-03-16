@@ -1,0 +1,71 @@
+name: Checks - Shiden
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+      - 'examples/**'
+      - 'rewrite/**'
+      - 'Cargo.toml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pages: write
+
+jobs:
+  shiden:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    environment:
+      name: checks
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      # Useless as runnning it compiles anyway.
+      #- name: Run cargo build
+      #  run: cargo build --release
+
+      - name: Run Shiden Brainfuck interpreter
+        run: cargo run -- run examples/brainfuck
+
+      - name: Run Shiden Hello World example
+        run: cargo run -- run examples/HelloWorld
+
+      - name: Run Shiden Types example
+        run: cargo run -- run examples/types
+
+      # Soon
+      #- name: Run Shiden Fibonacci example
+      #  run: cargo run -- run examples/fibonacci
+      
+      #- name: Run Shiden HTTP server (with timeout)
+      #  run: timeout 5s cargo run -- run examples/http\ server || [ $? -eq 124 ]
+
+      - name: Cache Cargo directories
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-

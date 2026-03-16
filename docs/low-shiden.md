@@ -89,6 +89,13 @@ Bootstrapping and self-hosting
 - Provide a minimal runtime for the host (heap alloc, print helpers) under `libraries/runtime/<target>/`.
 - Gradually implement more backends and use LowShiden to express parts of the compiler/runtime itself.
 
+Self-hosting constraint and backend strategy
+- Long-term: once the compiler is self-hosted, all compiler components and backends should be expressible in LowShiden itself (no permanent reliance on other languages).
+- Practical bootstrap: initially ship a tiny host runtime and runner (implemented in Rust) whose sole purpose is to execute LowShiden programs during bootstrapping. This bootstrap runner is intentionally minimal and temporary.
+- Backend-as-LowShiden: design the backend protocol so a backend can be either a native program or a LowShiden program that reads IR and emits target output. The bootstrap runner will be able to execute LowShiden backends to produce object/asm for targets during the transition to full self-hosting.
+- IR/CLI contract: define a small, versioned IR and a concise CLI contract for backends (input IR path, output path, target triple, protocol version). Backends written in LowShiden should follow the same contract and write output files directly.
+- Discoverability: the compiler locates backends by name/path; when a backend is a LowShiden program, the bootstrap runner executes it. This allows adding new outputs by writing LowShiden backends and placing them where the compiler can find them.
+
 Notes and next steps
 - This document captures the initial LowShiden surface and constraints. It references existing Shiden language rules in `docs/language/*.md` and helper binaries in `docs/helpers.md`.
 - Next: scaffold the `compiler` CLI and a parser module that recognizes the LowShiden subset.

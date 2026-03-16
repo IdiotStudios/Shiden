@@ -1,0 +1,1163 @@
+use crate::syntax::{Expr, Item, Lexer, Program, Stmt, Token};
+
+struct Parser<'a> {
+    lexer: Lexer<'a>,
+    cur: Token,
+    peek: Token,
+    cur_pos: (usize, usize),
+    peek_pos: (usize, usize),
+}
+
+type ParsedFunction = (
+    String,
+    Vec<(String, Option<String>)>,
+    Option<String>,
+    Vec<Stmt>,
+);
+
+impl<'a> Parser<'a> {
+    fn new(src: &'a str) -> Self {
+        let mut lx = Lexer::new(src);
+        let (cur, cur_line, cur_col) = lx.next_token_with_pos();
+        let (peek, peek_line, peek_col) = lx.next_token_with_pos();
+        Parser {
+            lexer: lx,
+            cur,
+            peek,
+            cur_pos: (cur_line, cur_col),
+            peek_pos: (peek_line, peek_col),
+        }
+    }
+
+    fn advance(&mut self) {
+        self.cur = std::mem::replace(&mut self.peek, Token::Eof);
+        self.cur_pos = self.peek_pos;
+        let (next, line, col) = self.lexer.next_token_with_pos();
+        self.peek = next;
+        self.peek_pos = (line, col);
+    }
+
+    fn parse_program(&mut self) -> Result<Program, String> {
+        let mut items = vec![];
+        loop {
+            match &self.cur {
+                Token::Eof => break,
+                Token::Fn => {
+                    if let Token::Slash = self.peek {
+                        self.advance();
+                        self.advance();
+                        continue;
+                    }
+                    let f = self.parse_function()?;
+                    items.push(Item::Function {
+                        name: f.0,
+                        params: f.1,
+                        ret: f.2,
+                        body: f.3,
+                    });
+                }
+                Token::Let => {
+                    if let Token::StringLiteral(_) = self.peek {
+                        match self.parse_import() {
+                            Ok((path, alias)) => {
+                                items.push(Item::Import { path, alias });
+                            }
+                            Err(_) => {
+                                self.advance();
+                            }
+                        }
+                    } else {
+                        self.advance();
+                    }
+                }
+                _ => {
+                    self.advance();
+                }
+            }
+        }
+        Ok(Program { items })
+    }
+
+    fn parse_import(&mut self) -> Result<(String, String), String> {
+        self.advance();
+
+        let path = match &self.cur {
+            Token::StringLiteral(s) => s.clone(),
+            other => {
+                return Err(format!(
+                    "expected string literal for import path, got: {:?}",
+                    other
+                ));
+            }
+        };
+
+        self.advance();
+
+        if let Token::Equal = &self.cur {
+            self.advance();
+        } else {
+            return Err("expected '=' after import path".into());
+        }
+
+        let alias = match &self.cur {
+            Token::StringLiteral(s) => s.clone(),
+            Token::Identifier(s) => s.clone(),
+            other => {
+                return Err(format!(
+                    "expected string or identifier for import alias, got: {:?}",
+                    other
+                ));
+            }
+        };
+
+        self.advance();
+
+        if let Token::Type(t) = &self.cur {
+            if t == "import" {
+                self.advance();
+                Ok((path, alias))
+            } else {
+                Err("expected '/import' type suffix".into())
+            }
+        } else {
+            Err("expected '/import' type suffix".into())
+        }
+    }
+
+    fn parse_function(&mut self) -> Result<ParsedFunction, String> {
+        self.advance();
+        match &self.cur {
+            Token::New => {}
+            other => return Err(format!("expected 'new' after fn, got: {:?}", other)),
+        }
+        self.advance();
+
+        let mut name_parts: Vec<String> = Vec::new();
+
+        loop {
+            match &self.cur {
+                Token::Identifier(s) => {
+                    name_parts.push(s.clone());
+                }
+                Token::New => {
+                    name_parts.push("new".to_string());
+                }
+                _ => {
+                    if name_parts.is_empty() {
+                        return Err(format!(
+                            "expected identifier for fn name, got: {:?}",
+                            self.cur
+                        ));
+                    }
+                    break;
+                }
+            }
+
+            match &self.peek {
+                Token::Identifier(_) | Token::New => {
+                    self.advance();
+                }
+                Token::LParen => {
+                    break;
+                }
+                _ => break,
+            }
+        }
+
+        let name = name_parts.join("_");
+
+        let mut params: Vec<(String, Option<String>)> = Vec::new();
+        self.advance();
+        if let Token::LParen = &self.cur {
+            self.advance();
+            while let Token::Identifier(_) = &self.cur {
+                if let Token::Identifier(id) = &self.cur {
+                    let name = id.clone();
+                    self.advance();
+                    params.push((name, None));
+                }
+                if let Token::Comma = &self.cur {
+                    self.advance();
+                    continue;
+                }
+                break;
+            }
+            if let Token::RParen = &self.cur {
+                self.advance();
+            } else {
+                return Err("expected ')' in parameter list".into());
+            }
+        }
+
+        let ret_type: Option<String> = None;
+        match &self.cur {
+            Token::Slash => {
+                self.advance();
+            }
+            other => {
+                return Err(format!(
+                    "expected '/' after function header, got: {:?}",
+                    other
+                ));
+            }
+        }
+
+        let mut body = Vec::new();
+        while !(matches!(&self.cur, Token::Fn) && matches!(&self.peek, Token::Slash)) {
+            if let Token::Eof = &self.cur {
+                return Err("unexpected EOF while parsing function body".into());
+            }
+
+            if let Some(stmt) = self.parse_stmt()? {
+                body.push(stmt);
+            } else {
+                self.advance();
+            }
+        }
+
+        self.advance();
+        self.advance();
+
+        Ok((name, params, ret_type, body))
+    }
+
+    fn parse_stmt(&mut self) -> Result<Option<Stmt>, String> {
+        match &self.cur {
+            Token::Let => {
+                self.advance();
+                let mut mutable = false;
+                if let Token::Mut = &self.cur {
+                    mutable = true;
+                    self.advance();
+                }
+                let name = match &self.cur {
+                    Token::Identifier(s) => s.clone(),
+                    other => {
+                        return Err(format!("expected identifier after let, got: {:?}", other));
+                    }
+                };
+                self.advance();
+                if let Token::Equal = &self.cur {
+                } else {
+                    return Err("expected '=' after let name".into());
+                }
+                self.advance();
+                let expr = self.parse_expr()?;
+
+                let ty = if let Token::Type(t) = &self.cur {
+                    let s = t.clone();
+                    self.advance();
+                    s
+                } else {
+                    return Err("expected '/<type>' after statement".into());
+                };
+                Ok(Some(Stmt::Let {
+                    name,
+                    value: expr,
+                    mutable,
+                    ty: Some(ty),
+                }))
+            }
+            Token::Return => {
+                self.advance();
+                let expr = self.parse_expr()?;
+                if let Token::Slash = &self.cur {
+                    self.advance();
+                    Ok(Some(Stmt::Return(expr, None)))
+                } else {
+                    Err("expected '/' after return".into())
+                }
+            }
+            Token::Break => {
+                self.advance();
+                if let Token::Slash = &self.cur {
+                    self.advance();
+                    Ok(Some(Stmt::Break))
+                } else {
+                    Err("expected '/' after break".into())
+                }
+            }
+            Token::Continue => {
+                self.advance();
+                if let Token::Slash = &self.cur {
+                    self.advance();
+                    Ok(Some(Stmt::Continue))
+                } else {
+                    Err("expected '/' after continue".into())
+                }
+            }
+            Token::For => {
+                self.advance();
+                let var = match &self.cur {
+                    Token::Identifier(s) => s.clone(),
+                    other => {
+                        return Err(format!("expected identifier after for, got: {:?}", other));
+                    }
+                };
+                self.advance();
+                if let Token::In = &self.cur {
+                    self.advance();
+                } else {
+                    return Err("expected 'in' after for variable".into());
+                }
+                let iterable = self.parse_expr()?;
+                if let Token::Slash = &self.cur {
+                    self.advance();
+                } else {
+                    return Err("expected '/' after for iterable".into());
+                }
+
+                let mut body = Vec::new();
+                while !(matches!(&self.cur, Token::For) && matches!(&self.peek, Token::Slash)) {
+                    if let Token::Eof = &self.cur {
+                        return Err("unexpected EOF while parsing for body".into());
+                    }
+                    if let Some(stmt) = self.parse_stmt()? {
+                        body.push(stmt);
+                    } else {
+                        self.advance();
+                    }
+                }
+
+                if matches!(&self.cur, Token::For) && matches!(&self.peek, Token::Slash) {
+                    self.advance();
+                    self.advance();
+                } else {
+                    return Err("expected 'for/' to close for".into());
+                }
+                Ok(Some(Stmt::For {
+                    var,
+                    iterable,
+                    body,
+                }))
+            }
+            Token::If => {
+                self.advance();
+                let cond = self.parse_expr()?;
+                if let Token::Slash = &self.cur {
+                    self.advance();
+                } else {
+                    return Err("expected '/' after if condition".into());
+                }
+
+                let mut then_block = Vec::new();
+                while !(matches!(&self.cur, Token::Else)
+                    || (matches!(&self.cur, Token::If) && matches!(&self.peek, Token::Slash)))
+                {
+                    if let Token::Eof = &self.cur {
+                        return Err("unexpected EOF in if then-block".into());
+                    }
+                    if let Some(stmt) = self.parse_stmt()? {
+                        then_block.push(stmt);
+                    } else {
+                        self.advance();
+                    }
+                }
+                let mut else_block = None;
+                if let Token::Else = &self.cur {
+                    self.advance();
+                    if let Token::Slash = &self.cur {
+                        self.advance();
+                    } else {
+                        return Err("expected '/' after else".into());
+                    }
+                    let mut eblock = Vec::new();
+                    while !(matches!(&self.cur, Token::If) && matches!(&self.peek, Token::Slash)) {
+                        if let Token::Eof = &self.cur {
+                            return Err("unexpected EOF in else block".into());
+                        }
+                        if let Some(stmt) = self.parse_stmt()? {
+                            eblock.push(stmt);
+                        } else {
+                            self.advance();
+                        }
+                    }
+                    else_block = Some(eblock);
+                }
+
+                if matches!(&self.cur, Token::If) && matches!(&self.peek, Token::Slash) {
+                    self.advance();
+                    self.advance();
+                } else {
+                    return Err("expected 'if/' to close if".into());
+                }
+                Ok(Some(Stmt::If {
+                    cond,
+                    then_block,
+                    else_block,
+                }))
+            }
+            Token::While => {
+                self.advance();
+                let cond = self.parse_expr()?;
+                if let Token::Slash = &self.cur {
+                    self.advance();
+                } else {
+                    return Err("expected '/' after while condition".into());
+                }
+
+                let mut body = Vec::new();
+                while !(matches!(&self.cur, Token::While) && matches!(&self.peek, Token::Slash)) {
+                    if let Token::Eof = &self.cur {
+                        return Err("unexpected EOF in while body".into());
+                    }
+                    if let Some(stmt) = self.parse_stmt()? {
+                        body.push(stmt);
+                    } else {
+                        self.advance();
+                    }
+                }
+
+                if matches!(&self.cur, Token::While) && matches!(&self.peek, Token::Slash) {
+                    self.advance();
+                    self.advance();
+                } else {
+                    return Err("expected 'while/' to close while".into());
+                }
+                Ok(Some(Stmt::While { cond, body }))
+            }
+            Token::Identifier(_) => {
+                if let Token::Identifier(id) = &self.cur {
+                    let name = id.clone();
+
+                    if let Token::LBracket = &self.peek {
+                        self.advance();
+                        self.advance();
+                        let idx = self.parse_expr()?;
+                        if let Token::RBracket = &self.cur {
+                            self.advance();
+                        } else {
+                            return Err("expected ']' in index".into());
+                        }
+                        if let Token::Equal = &self.cur {
+                            self.advance();
+                            let expr = self.parse_expr()?;
+                            if let Token::Slash = &self.cur {
+                                self.advance();
+                                return Ok(Some(Stmt::AssignIndex {
+                                    name,
+                                    index: idx,
+                                    value: expr,
+                                }));
+                            } else {
+                                return Err("expected '/' after assignment".into());
+                            }
+                        }
+                    }
+                    if let Token::Equal = &self.peek {
+                        self.advance();
+                        self.advance();
+                        let expr = self.parse_expr()?;
+                        if let Token::Slash = &self.cur {
+                            self.advance();
+                            return Ok(Some(Stmt::Assign { name, value: expr }));
+                        } else {
+                            return Err("expected '/' after assignment".into());
+                        }
+                    }
+                }
+
+                let expr = self.parse_expr()?;
+                if let Token::Slash = &self.cur {
+                    self.advance();
+                    Ok(Some(Stmt::Expr(expr)))
+                } else {
+                    Err("expected '/' after expression".into())
+                }
+            }
+            Token::StringLiteral(_) => {
+                let expr = self.parse_expr()?;
+                if let Token::Slash = &self.cur {
+                    self.advance();
+                    Ok(Some(Stmt::Expr(expr)))
+                } else {
+                    Err("expected '/' after expression".into())
+                }
+            }
+            _ => Ok(None),
+        }
+    }
+
+    fn parse_expr(&mut self) -> Result<Expr, String> {
+        self.parse_or()
+    }
+
+    fn parse_comparison(&mut self) -> Result<Expr, String> {
+        let mut left = self.parse_add_sub()?;
+        loop {
+            let op = match &self.cur {
+                Token::EqEq => Some(crate::syntax::BinOp::Eq),
+                Token::NotEq => Some(crate::syntax::BinOp::Ne),
+                Token::Less => Some(crate::syntax::BinOp::Lt),
+                Token::LessEqual => Some(crate::syntax::BinOp::Le),
+                Token::Greater => Some(crate::syntax::BinOp::Gt),
+                Token::GreaterEqual => Some(crate::syntax::BinOp::Ge),
+                _ => None,
+            };
+            if let Some(op) = op {
+                self.advance();
+                let right = self.parse_add_sub()?;
+                left = Expr::Binary {
+                    left: Box::new(left),
+                    op,
+                    right: Box::new(right),
+                };
+                continue;
+            }
+            break;
+        }
+        Ok(left)
+    }
+
+    fn parse_and(&mut self) -> Result<Expr, String> {
+        let mut left = self.parse_comparison()?;
+        loop {
+            if let Token::AndAnd = self.cur {
+                self.advance();
+                let right = self.parse_comparison()?;
+                left = Expr::Binary {
+                    left: Box::new(left),
+                    op: crate::syntax::BinOp::And,
+                    right: Box::new(right),
+                };
+                continue;
+            }
+            break;
+        }
+        Ok(left)
+    }
+
+    #[allow(dead_code)]
+    fn parse_or(&mut self) -> Result<Expr, String> {
+        let mut left = self.parse_and()?;
+        loop {
+            if let Token::OrOr = self.cur {
+                self.advance();
+                let right = self.parse_and()?;
+                left = Expr::Binary {
+                    left: Box::new(left),
+                    op: crate::syntax::BinOp::Or,
+                    right: Box::new(right),
+                };
+                continue;
+            }
+            break;
+        }
+        Ok(left)
+    }
+
+    fn parse_add_sub(&mut self) -> Result<Expr, String> {
+        let mut left = self.parse_mul_div()?;
+        loop {
+            let op = match &self.cur {
+                Token::Plus => Some(crate::syntax::BinOp::Add),
+                Token::Minus => Some(crate::syntax::BinOp::Sub),
+                _ => None,
+            };
+            if let Some(op) = op {
+                self.advance();
+                let right = self.parse_mul_div()?;
+                left = Expr::Binary {
+                    left: Box::new(left),
+                    op,
+                    right: Box::new(right),
+                };
+                continue;
+            }
+            break;
+        }
+        Ok(left)
+    }
+
+    fn parse_mul_div(&mut self) -> Result<Expr, String> {
+        let mut left = self.parse_unary()?;
+        loop {
+            let op = match &self.cur {
+                Token::Star => Some(crate::syntax::BinOp::Mul),
+                Token::SlashOp => Some(crate::syntax::BinOp::Div),
+                _ => None,
+            };
+            if let Some(op) = op {
+                self.advance();
+                let right = self.parse_unary()?;
+                left = Expr::Binary {
+                    left: Box::new(left),
+                    op,
+                    right: Box::new(right),
+                };
+                continue;
+            }
+            break;
+        }
+        Ok(left)
+    }
+
+    fn parse_unary(&mut self) -> Result<Expr, String> {
+        match &self.cur {
+            Token::Minus => {
+                self.advance();
+                let rhs = self.parse_unary()?;
+
+                Ok(Expr::Unary {
+                    op: crate::syntax::UnaryOp::Neg,
+                    expr: Box::new(rhs),
+                })
+            }
+            Token::Bang => {
+                self.advance();
+                let inner = self.parse_unary()?;
+                Ok(Expr::Unary {
+                    op: crate::syntax::UnaryOp::Not,
+                    expr: Box::new(inner),
+                })
+            }
+            _ => self.parse_primary(),
+        }
+    }
+
+    fn parse_primary(&mut self) -> Result<Expr, String> {
+        match &self.cur {
+            Token::Identifier(name) => {
+                let name = name.clone();
+                if name == "true" {
+                    self.advance();
+                    return Ok(Expr::Bool(true));
+                }
+                if name == "false" {
+                    self.advance();
+                    return Ok(Expr::Bool(false));
+                }
+
+                if name == "fs"
+                    && let Token::Identifier(_) = &self.peek
+                {
+                    self.advance();
+
+                    let mut parts: Vec<String> = Vec::new();
+                    if let Token::Identifier(s) = &self.cur {
+                        parts.push(s.clone());
+                    }
+
+                    if let Token::Minus = &self.peek {
+                        self.advance();
+                        if let Token::Identifier(_s2) = &self.peek {
+                            self.advance();
+                            if let Token::Identifier(s2v) = &self.cur {
+                                parts.push(s2v.clone());
+                            }
+                        }
+                    }
+
+                    if let Token::LParen = &self.peek {
+                        self.advance();
+                        self.advance();
+                        let mut args = Vec::new();
+                        while let Token::StringLiteral(_)
+                        | Token::Identifier(_)
+                        | Token::Number(_)
+                        | Token::LParen
+                        | Token::Bang
+                        | Token::Minus
+                        | Token::CharLiteral(_) = &self.cur
+                        {
+                            args.push(self.parse_expr()?);
+                            if let Token::Comma = &self.cur {
+                                self.advance();
+                                continue;
+                            }
+                            if let Token::RParen = &self.cur {
+                                break;
+                            }
+                        }
+                        if let Token::RParen = &self.cur {
+                            self.advance();
+                        } else {
+                            return Err("expected ')'".into());
+                        }
+                        let sub = parts.join("-");
+                        let combined = format!("fs_{}", sub.replace('-', "_"));
+                        return Ok(Expr::Call {
+                            name: combined,
+                            args,
+                        });
+                    }
+
+                    return Ok(Expr::Identifier(name));
+                }
+
+                if name == "net"
+                    && let Token::Identifier(_) = &self.peek
+                {
+                    self.advance();
+
+                    let mut parts: Vec<String> = Vec::new();
+
+                    loop {
+                        match &self.cur {
+                            Token::Identifier(s) => {
+                                parts.push(s.clone());
+                            }
+                            Token::New => {
+                                parts.push("new".to_string());
+                            }
+                            _ => break,
+                        }
+
+                        if let Token::LParen = &self.peek {
+                            break;
+                        }
+                        if let Token::Identifier(_) | Token::New = &self.peek {
+                            self.advance();
+                        } else {
+                            break;
+                        }
+                    }
+                    if let Token::LParen = &self.peek {
+                        self.advance();
+                        self.advance();
+                        let mut args = Vec::new();
+                        while let Token::StringLiteral(_)
+                        | Token::Identifier(_)
+                        | Token::Number(_)
+                        | Token::LParen
+                        | Token::Bang
+                        | Token::Minus
+                        | Token::CharLiteral(_) = &self.cur
+                        {
+                            args.push(self.parse_expr()?);
+                            if let Token::Comma = &self.cur {
+                                self.advance();
+                                continue;
+                            }
+                            if let Token::RParen = &self.cur {
+                                break;
+                            }
+                        }
+                        if let Token::RParen = &self.cur {
+                            self.advance();
+                        } else {
+                            return Err("expected ')'".into());
+                        }
+                        let combined = format!("net_{}", parts.join("_"));
+                        return Ok(Expr::Call {
+                            name: combined,
+                            args,
+                        });
+                    }
+
+                    return Ok(Expr::Identifier(name));
+                }
+
+                let known_libraries = ["math", "fs", "net", "ftpdb", "http"];
+                if known_libraries.contains(&name.as_str())
+                    && let Token::Identifier(_) = &self.peek
+                {
+                    self.advance();
+
+                    let mut parts: Vec<String> = Vec::new();
+
+                    loop {
+                        match &self.cur {
+                            Token::Identifier(s) => {
+                                parts.push(s.clone());
+                            }
+                            Token::New => {
+                                parts.push("new".to_string());
+                            }
+                            _ => break,
+                        }
+
+                        if let Token::LParen = &self.peek {
+                            break;
+                        }
+                        if let Token::Identifier(_) | Token::New = &self.peek {
+                            self.advance();
+                        } else {
+                            break;
+                        }
+                    }
+                    if let Token::LParen = &self.peek {
+                        self.advance();
+                        self.advance();
+                        let mut args = Vec::new();
+                        while let Token::StringLiteral(_)
+                        | Token::Identifier(_)
+                        | Token::Number(_)
+                        | Token::LParen
+                        | Token::Bang
+                        | Token::Minus
+                        | Token::CharLiteral(_) = &self.cur
+                        {
+                            args.push(self.parse_expr()?);
+                            if let Token::Comma = &self.cur {
+                                self.advance();
+                                continue;
+                            }
+                            if let Token::RParen = &self.cur {
+                                break;
+                            }
+                        }
+                        if let Token::RParen = &self.cur {
+                            self.advance();
+                        } else {
+                            return Err("expected ')'".into());
+                        }
+                        let combined = format!("{}_{}", name, parts.join("_"));
+                        return Ok(Expr::Call {
+                            name: combined,
+                            args,
+                        });
+                    }
+
+                    return Ok(Expr::Identifier(name));
+                }
+
+                self.advance();
+                if let Token::LParen = &self.cur {
+                    self.advance();
+                    let mut args = Vec::new();
+                    while let Token::StringLiteral(_)
+                    | Token::Identifier(_)
+                    | Token::Number(_)
+                    | Token::LParen
+                    | Token::Bang
+                    | Token::Minus
+                    | Token::CharLiteral(_) = &self.cur
+                    {
+                        args.push(self.parse_expr()?);
+                        if let Token::Comma = &self.cur {
+                            self.advance();
+                            continue;
+                        }
+                        if let Token::RParen = &self.cur {
+                            break;
+                        }
+                    }
+                    if let Token::RParen = &self.cur {
+                        self.advance();
+                    } else {
+                        return Err("expected ')'".into());
+                    }
+
+                    let mut primary = Expr::Call { name, args };
+                    while let Token::LBracket = &self.cur {
+                        self.advance();
+                        let idx = self.parse_expr()?;
+                        if let Token::RBracket = &self.cur {
+                            self.advance();
+                        } else {
+                            return Err("expected ']'".into());
+                        }
+                        primary = Expr::Index {
+                            expr: Box::new(primary),
+                            index: Box::new(idx),
+                        };
+                    }
+
+                    Ok(primary)
+                } else {
+                    let mut primary = Ok(Expr::Identifier(name));
+
+                    while let Token::LBracket = &self.cur {
+                        self.advance();
+                        let idx = self.parse_expr()?;
+                        if let Token::RBracket = &self.cur {
+                            self.advance();
+                        } else {
+                            return Err("expected ']'".into());
+                        }
+                        let cur_expr = primary?;
+                        primary = Ok(Expr::Index {
+                            expr: Box::new(cur_expr),
+                            index: Box::new(idx),
+                        });
+                    }
+                    primary
+                }
+            }
+            Token::StringLiteral(s) => {
+                let s = s.clone();
+                self.advance();
+                Ok(Expr::StringLiteral(s))
+            }
+            Token::CharLiteral(c) => {
+                let c = *c;
+                self.advance();
+                Ok(Expr::Char(c))
+            }
+            Token::Number(n) => {
+                let n = n.clone();
+
+                if n.contains('.') {
+                    match n.parse::<f64>() {
+                        Ok(f) => {
+                            self.advance();
+                            Ok(Expr::Float(f))
+                        }
+                        Err(_) => {
+                            self.advance();
+                            Err(format!("Invalid float literal: {}", n))
+                        }
+                    }
+                } else {
+                    self.advance();
+                    Ok(Expr::Number(n))
+                }
+            }
+            Token::LBracket => {
+                self.advance();
+                let mut elems = Vec::new();
+                while !matches!(&self.cur, Token::RBracket) {
+                    elems.push(self.parse_expr()?);
+                    if let Token::Comma = &self.cur {
+                        self.advance();
+                        continue;
+                    }
+                    if matches!(&self.cur, Token::RBracket) {
+                        break;
+                    }
+                }
+                if let Token::RBracket = &self.cur {
+                    self.advance();
+                    Ok(Expr::ArrayLiteral(elems))
+                } else {
+                    Err("expected ']'".into())
+                }
+            }
+            Token::LParen => {
+                self.advance();
+                let e = self.parse_expr()?;
+                if let Token::RParen = &self.cur {
+                    self.advance();
+                    Ok(e)
+                } else {
+                    Err("expected ')'".into())
+                }
+            }
+            other => Err(format!("unexpected token in expr: {:?}", other)),
+        }
+    }
+}
+
+pub fn parse(src: &str) -> Result<Program, String> {
+    let mut p = Parser::new(src);
+    match p.parse_program() {
+        Ok(prog) => Ok(prog),
+        Err(e) => Err(format!("{} (line {}, col {})", e, p.cur_pos.0, p.cur_pos.1)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_function_with_let_and_call() {
+        let src =
+            "fn new greet/\n    let name = \"Nayte\"/str\n    println(\"Hello {}\", name)/\nfn/";
+        let res = parse(src).expect("parse failed");
+        assert_eq!(res.items.len(), 1);
+        match &res.items[0] {
+            Item::Function {
+                name, params, body, ..
+            } => {
+                assert_eq!(name, "greet");
+                assert_eq!(params.len(), 0);
+                assert_eq!(body.len(), 2);
+            }
+            _ => panic!("expected function"),
+        }
+    }
+
+    #[test]
+    fn parse_function_with_params() {
+        let src = "fn new add(a, b)/\n    println(\"{} {}\", a, b)/\nfn/";
+        let res = parse(src).expect("parse failed");
+        match &res.items[0] {
+            Item::Function {
+                name, params, body, ..
+            } => {
+                assert_eq!(name, "add");
+                assert_eq!(
+                    params,
+                    &vec![("a".to_string(), None), ("b".to_string(), None)]
+                );
+                assert_eq!(body.len(), 1);
+            }
+            _ => panic!("expected function"),
+        }
+    }
+
+    #[test]
+    fn parse_if_else() {
+        let src = "fn new main/\n    if 1 == 1/\n        println(\"yes\")/\n    else/\n        println(\"no\")/\n    if/\nfn/";
+        let res = parse(src).expect("parse failed");
+        match &res.items[0] {
+            Item::Function { name, body, .. } => {
+                assert_eq!(name, "main");
+                assert_eq!(body.len(), 1);
+            }
+            _ => panic!("expected function"),
+        }
+    }
+
+    #[test]
+    fn parse_while_simple() {
+        let src = "fn new main/\n    let mut x = 0/i64\n    while x < 3/\n        x = x + 1/\n    while/\n    println(\"{}\", x)/\nfn/";
+        let res = parse(src).expect("parse failed");
+        match &res.items[0] {
+            Item::Function { name, body, .. } => {
+                assert_eq!(name, "main");
+                assert_eq!(body.len(), 3);
+                match &body[1] {
+                    Stmt::While { cond: _, body: b } => assert_eq!(b.len(), 1),
+                    other => panic!("expected while, got {:?}", other),
+                }
+            }
+            _ => panic!("expected function"),
+        }
+    }
+
+    #[test]
+    fn parse_let_with_type() {
+        let src = "fn new main/\n    let age = 20/u8\nfn/";
+        let res = parse(src).expect("parse failed");
+        match &res.items[0] {
+            Item::Function { body, .. } => {
+                assert_eq!(body.len(), 1);
+                match &body[0] {
+                    Stmt::Let {
+                        name,
+                        value,
+                        mutable,
+                        ty,
+                    } => {
+                        assert_eq!(name, "age");
+                        assert!(!(*mutable));
+                        assert_eq!(ty.as_ref().map(|s| s.as_str()), Some("u8"));
+                        match value {
+                            Expr::Number(n) => assert_eq!(n, "20"),
+                            _ => panic!("expected number"),
+                        }
+                    }
+                    other => panic!("unexpected stmt: {:?}", other),
+                }
+            }
+            _ => panic!("expected function"),
+        }
+    }
+
+    #[test]
+    fn parse_float_lets() {
+        let src = "fn new main/\n    let x = 1.5/f64\n    let y = 2.0/f64\n    println(\"{}\", x + y)/\nfn/";
+        let res = parse(src).expect("parse failed");
+        match &res.items[0] {
+            Item::Function { body, .. } => {
+                assert_eq!(body.len(), 3);
+            }
+            _ => panic!("expected function"),
+        }
+    }
+
+    #[test]
+    fn parse_array_and_index() {
+        let src = "fn new main/\n    let a = [1, 2, 3]/array\n    println(\"{}\", a[1])/\nfn/";
+        let res = parse(src).expect("parse failed");
+        match &res.items[0] {
+            Item::Function { body, .. } => {
+                assert_eq!(body.len(), 2);
+                match &body[0] {
+                    Stmt::Let {
+                        name: _name, value, ..
+                    } => match value {
+                        Expr::ArrayLiteral(elems) => assert_eq!(elems.len(), 3),
+                        _ => panic!("expected array"),
+                    },
+                    other => panic!("expected let, got {:?}", other),
+                }
+                match &body[1] {
+                    Stmt::Expr(e) => match e {
+                        Expr::Call { name, args } => {
+                            assert_eq!(name, "println");
+                            match &args[1] {
+                                Expr::Index { expr: _, index: _ } => {}
+                                _ => panic!("expected index expr"),
+                            }
+                        }
+                        _ => panic!("unexpected expr"),
+                    },
+                    other => panic!("expected expr, got {:?}", other),
+                }
+            }
+            _ => panic!("expected function"),
+        }
+    }
+
+    #[test]
+    fn debug_parse_brainfuck_example() {
+        let src = std::fs::read_to_string("examples/brainfuck/src/main.sd").expect("read example");
+        let prog = crate::frontend::parse(&src).expect("parse example");
+        assert!(!prog.items.is_empty());
+    }
+
+    #[test]
+    fn debug_parse_brainfuck_function() {
+        let src = std::fs::read_to_string("examples/brainfuck/src/main.sd").expect("read example");
+        let mut p = Parser::new(&src);
+
+        while !(matches!(&p.cur, Token::Fn) && matches!(&p.peek, Token::New)) {
+            p.advance();
+            if let Token::Eof = p.cur {
+                panic!("no function found");
+            }
+        }
+
+        match p.parse_function() {
+            Ok((name, _params, _ret, body)) => {
+                println!("Parsed function '{}' with {} stmts", name, body.len())
+            }
+            Err(e) => panic!(
+                "parse_function failed at cur {:?} peek {:?}: {}",
+                p.cur, p.peek, e
+            ),
+        }
+    }
+
+    #[test]
+    fn parse_ftpdb_library_call_name_lowering() {
+        let src = "fn new main/\n    let x = ftpdb top this week()/i64\nfn/";
+        let res = parse(src).expect("parse failed");
+        match &res.items[0] {
+            Item::Function { body, .. } => match &body[0] {
+                Stmt::Let { value, .. } => match value {
+                    Expr::Call { name, args } => {
+                        assert_eq!(name, "ftpdb_top_this_week");
+                        assert!(args.is_empty());
+                    }
+                    other => panic!("expected call expr, got {:?}", other),
+                },
+                other => panic!("expected let stmt, got {:?}", other),
+            },
+            _ => panic!("expected function"),
+        }
+    }
+
+    #[test]
+    fn parse_http_library_call_name_lowering() {
+        let src = "fn new main/\n    let x = http get(\"https://example.com\")/i64\nfn/";
+        let res = parse(src).expect("parse failed");
+        match &res.items[0] {
+            Item::Function { body, .. } => match &body[0] {
+                Stmt::Let { value, .. } => match value {
+                    Expr::Call { name, args } => {
+                        assert_eq!(name, "http_get");
+                        assert_eq!(args.len(), 1);
+                    }
+                    other => panic!("expected call expr, got {:?}", other),
+                },
+                other => panic!("expected let stmt, got {:?}", other),
+            },
+            _ => panic!("expected function"),
+        }
+    }
+}

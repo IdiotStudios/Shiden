@@ -4,4 +4,4 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-# No dependencies as we will rewrite every single package we need in rust.
+# No external dependencies
