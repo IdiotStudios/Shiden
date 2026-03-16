@@ -6,6 +6,10 @@
 
 Shiden is a high-performance ahead-of-time compiled language focused on speed, predictability, and low-level control, with a syntax familiar to Rust and JavaScript.
 
+## Note:
+
+Old Varient in Other/rust.zip
+
 ## Why Shiden?
 
 Shiden is designed for developers who want the performance of systems languages without the complexity that often comes with them.
