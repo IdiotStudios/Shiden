@@ -4,3 +4,5 @@
 .github/*
 !.github/funding.yml
 !.github/workflows/
+
+target/
