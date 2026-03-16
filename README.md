@@ -9,8 +9,176 @@ Shiden is a high-performance ahead-of-time compiled language focused on speed, p
 ## NOTE:
 Shiden is in early development and is not yet stable. Expect breaking changes and missing features. Contributions and feedback are welcome! Also I am in the process of rewriting teh rust implementation in ASM so expect some instability and missing features for a while. Release [v0.1.2](https://github.com/IdiotStudios/Shiden/releases/tag/v0.1.2) is the stable rust release, but the asm release is still in progress.
 
-## To the Shipwright reviewing my project
-The repo is being refactored so just ignore the assembly for now.Also you can run Shiden by downloading the relevant files for your OS from gh releases v0.1.2. The exe/binary are cli tools not GUI tools
+## LowShiden
+
+LowShiden is a minimal universal low-level language for Shiden.
+
+The goal of LowShiden is to provide a simple, readable, cross-platform assembly-like language that can:
+* bootstrap the Shiden compiler
+* allow Shiden to become self-hosting
+* provide a universal backend target
+* remain small enough to understand fully
+
+### Design Goals
+
+* Small instruction set (~40 instructions)
+* Readable syntax
+* Universal across CPU architectures
+* Easy compiler backend mapping
+* Capable of self-hosting
+
+### Registers
+
+LowShiden provides 16 general purpose registers.
+
+```
+r0
+r1
+r2
+r3
+r4
+r5
+r6
+r7
+r8
+r9
+r10
+r11
+r12
+r13
+r14
+r15
+```
+
+Libraries can create readable register aliases.
+
+Example:
+
+```
+alias r(result) = r0
+alias r(tmp) = r1
+alias r(arg0) = r2
+alias r(arg1) = r3
+```
+
+Usage:
+
+```
+add r(arg0) r(arg1)
+mov r(result) r(arg0)
+```
+
+### Instruction Set (~40 Instructions)
+
+#### Data Movement
+
+```
+mov dst src
+load dst addr
+store addr src
+push src
+pop dst
+swap a b
+```
+
+#### Arithmetic
+
+```
+add a b
+sub a b
+mul a b
+div a b
+mod a b
+inc a
+dec a
+neg a
+```
+
+#### Bit Operations
+
+```
+and a b
+or a b
+xor a b
+not a
+shl a b
+shr a b
+```
+
+#### Comparison
+
+```
+cmp a b
+test a
+```
+
+#### Control Flow
+
+```
+jmp label
+je label
+jne label
+jg label
+jl label
+jge label
+jle label
+```
+
+#### Function Control
+
+```
+call label
+ret
+enter
+leave
+```
+
+#### Memory / Addressing
+
+```
+lea dst addr
+alloc size
+free ptr
+```
+
+#### System Interaction
+
+```
+syscall
+trap
+halt
+```
+
+### Example: Function
+
+```
+alias r(result) = r0
+alias r(a) = r1
+alias r(b) = r2
+
+add r(a) r(b)
+mov r(result) r(a)
+ret
+```
+
+### Example: Linux Socket (Conceptual)
+
+```
+mov r0 41
+mov r1 2
+mov r2 1
+mov r3 0
+syscall
+```
+
+### Bootstrapping Plan
+
+1. Implement LowShiden compiler
+2. Write core runtime in LowShiden
+3. Implement Shiden compiler using LowShiden
+4. Recompile Shiden using itself
+
+At this stage Shiden becomes self-hosting.
 
 ## Features
 
