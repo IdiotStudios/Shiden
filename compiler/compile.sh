@@ -1,6 +1,5 @@
 #!/bin/bash
-
-set -e
+set -euo pipefail
 
 ROOT_DIR=$(dirname "$0")
 ASM_DIR="$ROOT_DIR/src"
