@@ -212,9 +212,6 @@ Shiden aims to combine the performance and control of Rust with the simplicity o
 | `macos` | N/A | No | N/A |
 More architectures and platforms are planned.
 
-### Random Thought
-GitHub should add polls to repos. That would be peak.
-
 ## Installation
 
 ### Going to be added soon
@@ -227,15 +224,6 @@ GitHub should add polls to repos. That would be peak.
 - 📦 **[Shiden-Package-Registry]()** (hint...)  
 - 🧪 **[Benchmarks]()** (hmm very soon)  
 (thanks kde emoji picker)
-
-## Cli - Rust version
-| Command | Description | Status |
-| :--- | :--- | :---: |
-| `shiden run` | run shiden projects | ✅ |
-| `shiden check` | runs checks | ✅ |
-| `shiden new {name}` | creates a new project | ✅ |
-| `shiden compile` | compiles Shiden (run does the same anyway) | ✅ |
-| `shiden help` | shows help | ✅ |
 
 ## CLI - Assembly version
 | Command | Description | Status |
@@ -279,4 +267,4 @@ Licensed under the MIT License. See the `LICENSE` file for details.
 
 ## AI Notice
 
-Used AI for inline code completions and for documentation writing. Also for debugging.
+Used AI for inline code completions, documentation writing and for debugging.
