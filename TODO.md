@@ -1,68 +1,8 @@
 # Todo
 
-## libraries
-
-- [ ] `Graphics` - 2D graphics library with software rendering backend
-- [ ] `Audio` - audio playback library with support for multiple backends
-- [ ] `Inputs` - inputs library for handling keyboard, mouse, and gamepad input
-- [ ] `Networking` - high-level networking library for TCP/UDP communication
-- [ ] `Filesystem` - library for file I/O and path manipulation
-- [ ] `Process` - library for spawning and managing subprocesses
-- [ ] `Time` - library for working with time and timers
-- [ ] `Math` - library for common math functions and data structures (vectors, matrices, etc.)
-- [ ] `Concurrency` - library for working with threads and async tasks
-- [ ] `Database` - library for working with databases (SQLite, Postgres, etc)
-- [ ] `Graphics 3d` - 3D graphics library with software rendering backend
-- [ ] `Audio 3d` - 3D audio library with support for multiple backends
-- [ ] `Web` - library for making HTTP requests and working with web APIs
-- [ ] `GUI` - library for building graphical user interfaces
-
-## Targets
-
-- [x] `linux-x86_64`
-- [ ] `linux-arm`
-- [ ] `windows-x86_64` -dk if working yet
-- [ ] `windows-arm`
-- [ ] `v86` - supposedly better than asm
-- [ ] `macos-x86_64`
-- [ ] `macos-arm64`
-- [ ] `wasm32`
-- [ ] `android`
-- [ ] `ios`
-- [ ] `iso`
-- [ ] `bootloader`
-- [ ] `driver/kernel`
-
-## Tooling
-
-- [ ] `Package Manager` - tool for managing and publishing packages
-- [ ] `Formatter` - code formatter for Shiden source files
-- [x] `Linter` - tool for analyzing code for potential errors and style issues
-- [ ] `Language Server` - implementation of the Language Server Protocol for Shiden
-- [ ] `Debugger` - tool for debugging Shiden programs
-- [ ] `Profiler` - tool for profiling the performance of Shiden programs
-- [ ] `Build System` - tool for building and managing Shiden projects
-- [ ] `Documentation Generator` - tool for generating documentation from Shiden source code
-
-## CLI
-
-- [x] `shiden run` - Compile and run (--debug for debug mode)
-- [x] `shiden check` - Run checks
-- [ ] `shiden new {name}` - Create a new project
-- [ ] `shiden init` - Initialize a project in the current directory
-- [x] `shiden compile` - Compile Shiden (same as run but without running)
-- [x] `shiden help` - Show help message
-- [ ] `shiden update` - Check/install updates
-
-## Misc
-
-- [ ] `Benchmarks` - comprehensive benchmarks comparing Shiden to other languages
-- [x] `Examples` - collection of example projects demonstrating various features of Shiden
-- [ ] `Git Support` - built in git support for new projects (git init, add, commit, etc)
-- [ ] `CI/CD` - set up continuous integration and deployment for Shiden projects
-- [ ] `Community` - build a community around Shiden with forums, chat, etc
-- [ ] `More Examples` - more example projects demonstrating various features of Shiden
-- [ ] `Better Docs` - improve documentation with more examples, better explanations, etc
-- [ ] `More Libraries` - add more standard libraries for various use cases
-- [ ] `More Targets` - add support for more platforms and architectures
-- [ ] `More Tooling` - add more tools for working with Shiden projects
+- A Cli in rust
+- Make the cli have the proper commands
+- Make a compiler in rust that compiles to all platforms
+- The compiler is for the Low aspect of shiden so it would to compile low level shiden code to binary.
+- Use low level shiden implementation to compile itself and write shiden in it
+- The low level implementation must be cross platform and be able to have more platforms added easily.
